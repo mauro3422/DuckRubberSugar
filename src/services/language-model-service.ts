@@ -214,18 +214,65 @@ export class LanguageModelService {
   ): T {
     if (!parsed) return parsed;
     const patch: Record<string, unknown> = {};
+    const localCode = localCodeSketch?.trim() ?? "";
+    const modelCode = (parsed.code ?? "").trim();
+    const trustedLocalCode = Boolean(
+      localCode &&
+      (localCodeTags ?? []).some((tag) =>
+        ["spoken_print_call", "spoken_not_condition", "context_lexicon_reconstruction"].includes(tag)
+      )
+    );
 
     if (sourceTranscript?.trim() && !(parsed.transcript ?? "").trim()) {
       patch.transcript = sourceTranscript.trim();
     }
 
-    if (localCodeSketch?.trim() && !(parsed.code ?? "").trim()) {
-      patch.code = localCodeSketch.trim();
+    if (trustedLocalCode && this.shouldPreferLocalCode(modelCode, localCode, localCodeTags ?? [])) {
+      patch.code = localCode;
+      patch.code_origin = "speech_normalizer";
+      patch.code_tags = localCodeTags ?? [];
+      patch.code_notes = modelCode
+        ? "Codigo probable local usado porque la salida del modelo agrego estructura/prosa o contradijo el sketch ASR."
+        : "Codigo probable reconstruido localmente desde ASR y contexto disponible.";
+    } else if (localCode && !modelCode) {
+      patch.code = localCode;
       patch.code_origin = "speech_normalizer";
       patch.code_tags = localCodeTags ?? [];
       patch.code_notes = "Codigo probable reconstruido localmente desde ASR y contexto disponible.";
     }
 
     return Object.keys(patch).length ? { ...parsed, ...patch } as T : parsed;
+  }
+
+  private shouldPreferLocalCode(modelCode: string, localCode: string, localCodeTags: string[]): boolean {
+    if (!localCode) return false;
+    if (!modelCode) return true;
+
+    const model = modelCode.trim();
+    const local = localCode.trim();
+    const lowerModel = model.toLowerCase();
+    const lowerLocal = local.toLowerCase();
+
+    if (model === local) return false;
+
+    if (/^[>\s]+/.test(model)) return true;
+    if (/[¿?]/.test(model)) return true;
+    if (/\b(?:necesito|puedes|podrias|entendido|confirmar|contexto|algoritmo|quieres|qué quieres|what programming language)\b/i.test(model)) return true;
+    if (/\btrue\s+es\s+(?:true|false)\b/i.test(model)) return true;
+    if (/\/\/\s*(?:code to execute|add your logic|todo|your logic)/i.test(model)) return true;
+    if (model.length > Math.max(local.length * 2.2, local.length + 35)) return true;
+
+    if (localCodeTags.includes("spoken_not_condition")) {
+      const localIdentifier = lowerLocal.match(/if\s*\(!\s*([a-z_$][\w$]*)\s*\)/i)?.[1];
+      const modelIdentifier = lowerModel.match(/if\s*\(!\s*([a-z_$][\w$]*)\s*\)/i)?.[1];
+      if (localIdentifier && modelIdentifier && localIdentifier !== modelIdentifier) return true;
+    }
+
+    if (localCodeTags.includes("spoken_print_call")) {
+      if (/^#include\b|int\s+main\s*\(/i.test(model)) return true;
+      if (lowerModel.includes("printf") && lowerLocal.includes("printf") && model !== local) return true;
+    }
+
+    return false;
   }
 }

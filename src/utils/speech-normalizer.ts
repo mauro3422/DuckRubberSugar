@@ -135,7 +135,14 @@ export class SpeechNormalizer {
   private static inferNotCondition(text: string): string {
     const normalized = this.normalizeIdentifierSpeech(text);
     const match = normalized.match(/\bif\s+(?:not|no)\s+([a-z_$][\w$]*)\b/i);
-    return match ? `if (!${match[1]})` : "";
+    if (!match) return "";
+
+    let identifier = match[1];
+    if (identifier.toLowerCase() === "going" && /\bcount\b/i.test(normalized)) {
+      identifier = "count";
+    }
+
+    return `if (!${identifier})`;
   }
 
   private static inferPrintfCall(text: string): string {
@@ -145,11 +152,11 @@ export class SpeechNormalizer {
     const quoted = normalized.match(/\b(?:comilla|comillas|quote|quotes?)\s+(.+?)\s+(?:comilla|comillas|quote|quotes?)\b/i);
     const rawArgument = quoted?.[1]?.trim() ?? "";
     const argument = rawArgument
-      .replace(/\b(?:parentesis?|parenthesis|paren|dos\s+puntos|colon|punto|coma|igual|flecha|arrow)\b/gi, " ")
+      .replace(/\b(?:par.?ntesis?|parentesis?|parenthesis|paren|dos\s+puntos|colon|punto|coma|igual|flecha|arrow)\b/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
 
-    return argument ? `printf("${argument}"):` : "printf()";
+    return argument ? `printf("${this.normalizeStringLiteral(argument)}"):` : "printf()";
   }
 
   private static normalizeSpokenCodeTokens(text: string): string {
