@@ -83,7 +83,7 @@ export class PipelineEngine {
 
   async startRecording(delegate: import("../services/audio-service.js").AudioViewDelegate, lang = "es-AR"): Promise<void> {
     await this.initializeModel();
-    if (!this.model.hasAudioSession) return;
+    if (!this.model.hasSession) return;
 
     if (this.typingIntervalId !== null) {
       clearInterval(this.typingIntervalId);
@@ -103,7 +103,45 @@ export class PipelineEngine {
 
   stopRecording(): void {
     this.audio.stop((type, data = {}) => this.log(type, data));
-    this.store.update({ audioStateText: "Procesando audio..." });
+    this.store.update({
+      audioStateText: "Procesando audio...",
+      expectedTranscript: "",
+      manualTranscript: "",
+      isTranscribingAudio: true,
+    });
+    this.setStatus("Transcribiendo grabacion con Google ASR...");
+    void this.transcribeRecordedAudio();
+  }
+
+  private async transcribeRecordedAudio(): Promise<void> {
+    const requestId = ++this.audioTranscriptionRequestId;
+    this.audioTranscriptionPromise = this.audio.waitForRecordingReady()
+      .then(async (asset) => {
+        if (requestId !== this.audioTranscriptionRequestId) return;
+        if (!asset?.blob) throw new Error("No hay audio grabado para transcribir");
+        const file = new File([asset.blob], "grabacion.webm", { type: asset.blob.type || "audio/webm" });
+        const transcript = await this.transcribeAudioFile(file);
+        if (requestId !== this.audioTranscriptionRequestId) return;
+        this.store.update({ audioStateText: "Grabacion lista e indexada con ASR", manualTranscript: transcript });
+        this.log("recording-transcribed", { chars: transcript.length });
+        this.startTypingAnimation(transcript);
+      })
+      .catch((error) => {
+        if (requestId !== this.audioTranscriptionRequestId) return;
+        this.log("recording-transcribe-error", { message: (error as Error).message });
+        this.store.update({
+          expectedTranscript: "",
+          manualTranscript: "",
+          isTranscribingAudio: false,
+          audioStateText: "Grabacion lista, pero Google ASR fallo",
+        });
+        this.setStatus("Google ASR requerido para grabacion", "bad");
+      })
+      .finally(() => {
+        if (requestId === this.audioTranscriptionRequestId) {
+          this.audioTranscriptionPromise = null;
+        }
+      });
   }
 
   loadAudioFile(file: File, delegate: import("../services/audio-service.js").AudioViewDelegate): void {

@@ -18,6 +18,7 @@
 - Removed dataset transcript fallback; every audio run now requires Google ASR output.
 - Removed the visual transcript field as a file-audio prompt fallback; file runs now require the Google ASR transcript stored in `manualTranscript`.
 - Trusted local code sketches now override model code when the model adds prose, placeholders, broad scaffolding, or contradicts the ASR-derived identifier.
+- Microphone recordings now use the same Google ASR bridge path as loaded audio files before prompting the model.
 - Reports no longer refresh from the in-progress placeholder output while a prompt is running.
 - Model results are locally hydrated with the ASR transcript when the XML omits `<transcript>`.
 - Empty model `<code>` can be hydrated from the trusted local code sketch before triggering repair.
@@ -35,6 +36,7 @@
 - Prevented Live Server on `5500` from forcing the app to post audio to the wrong `/transcribe` endpoint.
 - Corrected `if not going ... count ...` style ASR ambiguity to prefer `count` for the benchmark condition case.
 - Prevented `printf` string reconstruction from swallowing spoken `parentesis` into the string literal.
+- Re-enabled the recording button in text-session mode; recording no longer requires Chrome Nano multimodal audio mode.
 - Prevented mixed `latestReport` states such as previous metrics plus `rawOutput: "Esperando respuesta..."`.
 - Avoided self-refinement for trusted deterministic local sketches.
 - Removed debug logging from `SpeechNormalizer`.

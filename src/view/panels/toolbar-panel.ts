@@ -29,7 +29,7 @@ export class ToolbarPanel extends UIComponent {
   }): void {
     const busy = options.isInitializing || options.isPromptRunning || options.isBenchmarkRunning;
     this.recordButton.disabled =
-      !options.hasApi || !options.hasSession || options.sessionMode !== "audio" || options.isRecording || busy;
+      !options.hasApi || !options.hasSession || options.isRecording || busy;
     this.stopButton.disabled = !options.isRecording || options.isBenchmarkRunning;
     this.sendButton.disabled = !options.hasApi || !options.hasAudio || options.isRecording || busy;
     this.runBenchButton.disabled = !options.hasApi || !options.hasAudio || options.isRecording || busy;

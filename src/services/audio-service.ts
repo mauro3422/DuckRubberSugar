@@ -71,6 +71,8 @@ export class AudioService {
   private current: AudioAsset | null = null;
   private durationReady: Promise<void> | null = null;
   private resolveDurationReady: (() => void) | null = null;
+  private recordingReady: Promise<AudioAsset | null> | null = null;
+  private resolveRecordingReady: ((asset: AudioAsset | null) => void) | null = null;
   private recognition: SpeechRecognition | null = null;
 
   private audioContext: AudioContext | null = null;
@@ -106,6 +108,9 @@ export class AudioService {
     this.fileDurationMs = null;
     this.durationReady = null;
     this.resolveDurationReady = null;
+    this.recordingReady = new Promise((resolve) => {
+      this.resolveRecordingReady = resolve;
+    });
     this.micTranscription = null;
     this.recognition = null;
     this.recordedVolumeHistory = [];
@@ -132,6 +137,8 @@ export class AudioService {
       this.stopTracks();
       this.mediaRecorder = null;
       onLog("recording-ready", { type: blob.type, size: blob.size });
+      this.resolveRecordingReady?.(this.current);
+      this.resolveRecordingReady = null;
     });
 
     this.mediaRecorder.start();
@@ -232,6 +239,9 @@ export class AudioService {
       this.stoppedAt = performance.now();
       this.mediaRecorder.stop();
       onLog("recording-stopped");
+    } else {
+      this.resolveRecordingReady?.(this.current);
+      this.resolveRecordingReady = null;
     }
     if (this.recognition) {
       try {
@@ -241,6 +251,13 @@ export class AudioService {
       }
       this.recognition = null;
     }
+  }
+
+  async waitForRecordingReady(timeoutMs = 2500): Promise<AudioAsset | null> {
+    if (!this.recordingReady) return this.current;
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+    const asset = await Promise.race([this.recordingReady, timeout]);
+    return asset ?? this.current;
   }
 
   loadFile(file: File, delegate: AudioViewDelegate, onLog: (type: string, data?: Record<string, unknown>) => void): void {
