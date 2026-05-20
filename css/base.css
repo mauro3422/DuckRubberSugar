@@ -1,0 +1,212 @@
+body {
+  margin: 0;
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  background-color: var(--bg-color);
+  background-image: 
+    radial-gradient(circle at 10% 20%, hsla(240, 75%, 65%, 0.08) 0%, transparent 60%),
+    radial-gradient(circle at 90% 80%, hsla(150, 84%, 55%, 0.04) 0%, transparent 65%),
+    radial-gradient(circle at 50% 50%, hsla(0, 0%, 0%, 0.8) 0%, var(--bg-color) 100%);
+  background-attachment: fixed;
+  color: var(--text-main);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button, input, textarea, select, pre {
+  font-family: inherit;
+}
+
+h1 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  background: linear-gradient(135deg, hsl(210, 20%, 95%) 0%, hsl(240, 80%, 75%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.8px;
+}
+
+h2 {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+h2::before {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 18px;
+  background: linear-gradient(to bottom, var(--accent-color), var(--accent-hover));
+  border-radius: 4px;
+}
+
+p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+label {
+  display: block;
+  margin: 20px 0 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+label:first-of-type {
+  margin-top: 0;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  color: var(--text-main);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.checkRow input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+textarea, input[type="file"], pre {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text-main);
+  transition: all 0.25s ease;
+}
+
+textarea:focus, input[type="file"]:focus, pre:focus-within {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+textarea {
+  resize: vertical;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+textarea::placeholder {
+  color: hsla(215, 15%, 65%, 0.3);
+  font-style: italic;
+}
+
+textarea#probableCode {
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--code-color);
+  background: hsla(222, 47%, 6%, 0.85);
+}
+
+textarea#systemPrompt {
+  background: hsla(222, 47%, 5%, 0.6);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+input[type="file"] {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+input[type="file"]::file-selector-button {
+  background: hsla(0, 0%, 100%, 0.05);
+  border: 1px solid var(--panel-border);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 6px;
+  margin-right: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: hsla(0, 0%, 100%, 0.1);
+  border-color: var(--accent-color);
+}
+
+pre {
+  min-height: 280px;
+  max-height: 520px;
+  margin: 0;
+  overflow: auto;
+  padding: 20px;
+  font-family: 'Fira Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--pre-color);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: hsla(222, 47%, 6%, 0.85);
+}
+
+pre.empty-state {
+  color: hsla(215, 15%, 65%, 0.3);
+  font-style: italic;
+  font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--input-bg);
+}
+
+/* ── Benchmark History Table ─────────────────────── */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+th, td {
+  padding: 12px;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 12px;
+}
+
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+td {
+  color: var(--text-main);
+}
+
+tr:hover td {
+  background: hsla(0, 0%, 100%, 0.02);
+}

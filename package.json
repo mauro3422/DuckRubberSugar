@@ -1,0 +1,15 @@
+{
+  "name": "ducksugar",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "python transcribe_server.py",
+    "asr": "python transcribe_server.py",
+    "dev": "tsc && python transcribe_server.py"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,58 @@
+.panel {
+  min-width: 0;
+  padding: 28px;
+  border: 1px solid var(--panel-border);
+  border-radius: 20px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+}
+
+.panel:hover {
+  border-color: hsla(240, 50%, 60%, 0.35);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35), 0 0 10px hsla(240, 75%, 65%, 0.05);
+}
+
+.panel.drag-over {
+  border-color: var(--accent-hover) !important;
+  background: hsla(240, 50%, 35%, 0.15) !important;
+  box-shadow: 0 0 30px var(--accent-glow) !important;
+  transform: translateY(-2px) scale(1.008);
+}
+
+/* ── Panel Breathing/Pulse active Neon glows ───────── */
+
+.panel.pulse-neon-cyan {
+  border-color: hsla(150, 84%, 55%, 0.45) !important;
+  box-shadow: 0 0 24px hsla(150, 84%, 55%, 0.15), 0 12px 40px rgba(0, 0, 0, 0.35) !important;
+  animation: panel-pulse-cyan 2.5s ease-in-out infinite alternate;
+}
+
+.panel.pulse-neon-indigo {
+  border-color: hsla(240, 75%, 65%, 0.45) !important;
+  box-shadow: 0 0 24px hsla(240, 75%, 65%, 0.15), 0 12px 40px rgba(0, 0, 0, 0.35) !important;
+  animation: panel-pulse-indigo 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes panel-pulse-cyan {
+  0% {
+    border-color: hsla(150, 84%, 55%, 0.25);
+    box-shadow: 0 0 12px hsla(150, 84%, 55%, 0.08), 0 12px 40px rgba(0, 0, 0, 0.25);
+  }
+  100% {
+    border-color: hsla(150, 84%, 55%, 0.55);
+    box-shadow: 0 0 32px hsla(150, 84%, 55%, 0.22), 0 16px 48px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@keyframes panel-pulse-indigo {
+  0% {
+    border-color: hsla(240, 75%, 65%, 0.25);
+    box-shadow: 0 0 12px hsla(240, 75%, 65%, 0.08), 0 12px 40px rgba(0, 0, 0, 0.25);
+  }
+  100% {
+    border-color: hsla(240, 75%, 65%, 0.55);
+    box-shadow: 0 0 32px hsla(240, 75%, 65%, 0.22), 0 16px 48px rgba(0, 0, 0, 0.4);
+  }
+}

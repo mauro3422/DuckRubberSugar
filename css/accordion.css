@@ -1,0 +1,259 @@
+/* ── Unified Diagnostics Console & Accordion Panel (Fase 9) ── */
+
+.console-panel {
+  display: flex;
+  flex-direction: column;
+  background: hsla(240, 16%, 10%, 0.65) !important; /* Richer dark glass background */
+  border: 1px solid var(--panel-border) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4) !important;
+  padding: 0 !important; /* Remove padding to control headers and body flushness */
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.console-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--panel-border);
+  background: hsla(240, 16%, 8%, 0.45);
+  user-select: none;
+}
+
+.console-title {
+  margin: 0 !important;
+  font-size: 15px !important;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.console-title::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 14px;
+  background: linear-gradient(to bottom, var(--accent-hover), var(--accent-color));
+  border-radius: 2px;
+}
+
+.console-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 32px;
+  flex-grow: 1;
+}
+
+.console-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  box-shadow: none;
+  backdrop-filter: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.console-tab:hover {
+  background: hsla(240, 16%, 16%, 0.5) !important;
+  color: var(--text-main) !important;
+  border-color: hsla(240, 50%, 60%, 0.15) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.console-tab.active {
+  background: hsla(240, 50%, 30%, 0.25) !important;
+  border: 1px solid hsla(240, 75%, 65%, 0.3) !important;
+  color: #fff !important;
+  text-shadow: 0 0 8px hsla(240, 75%, 65%, 0.35) !important;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.4), 0 0 10px hsla(240, 75%, 65%, 0.1) !important;
+}
+
+.console-tab.active[data-tab="raw-tab"] {
+  border-color: hsla(240, 75%, 65%, 0.45) !important;
+}
+
+.console-tab.active[data-tab="bench-tab"] {
+  border-color: hsla(150, 84%, 55%, 0.4) !important;
+  text-shadow: 0 0 8px hsla(150, 84%, 55%, 0.35) !important;
+}
+
+.console-tab.active[data-tab="debug-tab"] {
+  border-color: hsla(210, 85%, 80%, 0.4) !important;
+  text-shadow: 0 0 8px hsla(210, 85%, 80%, 0.35) !important;
+}
+
+.console-collapse-btn {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: all 0.25s ease;
+}
+
+.console-collapse-btn:hover {
+  background: hsla(240, 16%, 16%, 0.6) !important;
+  border-color: var(--text-muted) !important;
+  color: #fff !important;
+  transform: translateY(-1px) !important;
+}
+
+.collapse-icon {
+  display: inline-block;
+  font-size: 8px;
+  transition: transform 0.3s ease;
+}
+
+.console-body {
+  padding: 28px;
+  max-height: 800px;
+  opacity: 1;
+  transition: max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease, padding 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  overflow-y: auto;
+}
+
+.console-body.collapsed {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  pointer-events: none;
+  overflow: hidden !important;
+}
+
+.console-tab-content {
+  display: none;
+  animation: console-fade-in 0.35s ease;
+}
+
+.console-tab-content.active {
+  display: block;
+}
+
+@keyframes console-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Pre-Wrapper Layout ──────────────────────────── */
+
+.pre-wrapper {
+  position: relative;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pre-wrapper pre {
+  margin: 0 !important;
+  border-radius: 10px !important;
+  max-height: 280px !important; /* Reduced scrolled height to prevent giant blocks! */
+}
+
+/* ── Generic Collapsible Accordion Panel (Fase 9.8) ── */
+
+.collapsible-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important; /* Allow header and body to be flush */
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.collapsible-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--panel-border);
+  background: hsla(240, 16%, 8%, 0.45);
+  user-select: none;
+}
+
+.collapsible-panel .panel-header h2 {
+  margin: 0 !important;
+  font-size: 15px !important;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.collapsible-panel .panel-header h2::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 14px;
+  background: linear-gradient(to bottom, var(--accent-hover), var(--accent-color));
+  border-radius: 2px;
+}
+
+.collapsible-panel .panel-collapse-btn {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: all 0.25s ease;
+}
+
+.collapsible-panel .panel-collapse-btn:hover {
+  background: hsla(240, 16%, 16%, 0.6) !important;
+  border-color: var(--text-muted) !important;
+  color: #fff !important;
+  transform: translateY(-1px) !important;
+}
+
+.collapsible-panel .panel-body {
+  padding: 28px;
+  max-height: 500px; /* Safe upper limit for inputs height */
+  opacity: 1;
+  transition: max-height 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease, padding 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  overflow: hidden;
+}
+
+.collapsible-panel .panel-body.collapsed {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  pointer-events: none;
+}

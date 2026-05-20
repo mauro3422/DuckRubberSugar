@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gemini Nano XML & JSON Experimenter</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --panel: #111827;
+      --text: #f3f4f6;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --border: #1f2937;
+      --highlight: #10b981;
+      --warning: #f59e0b;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+      margin: 0;
+      line-height: 1.5;
+    }
+    main {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: var(--accent);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 12px;
+      margin-top: 0;
+      font-weight: 800;
+      font-size: 2.2rem;
+      background: linear-gradient(to right, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background-color: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .panel h3 {
+      margin-top: 0;
+      font-size: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+    textarea, select, input {
+      width: 100%;
+      background: #030712;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+    }
+    textarea:focus, select:focus, input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+    button {
+      background-color: var(--accent);
+      color: #030712;
+      font-weight: bold;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 0.95rem;
+    }
+    button:hover {
+      background-color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      background-color: #374151;
+      color: #6b7280;
+      cursor: not-allowed;
+      transform: none;
+    }
+    pre {
+      background: #030712;
+      padding: 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      min-height: 120px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .metric-card {
+      background: #030712;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      border-radius: 6px;
+    }
+    .metric-card div {
+      font-size: 0.8rem;
+      color: #9ca3af;
+    }
+    .metric-card span {
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--text);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-weight: 600;
+      color: #9ca3af;
+      background-color: #030712;
+    }
+    tr:hover td {
+      background-color: rgba(56, 189, 248, 0.03);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🧪 Gemini Nano: Experimento XML, JSON e Híbrido</h1>
+    <p style="color: #9ca3af; margin-top: -8px; margin-bottom: 20px;">Página aislada de pruebas y benchmarks rápidos de estructuración y velocidad.</p>
+
+    <div class="panel" style="margin-bottom: 24px;">
+      <h3>1. Comprobar disponibilidad</h3>
+      <button id="checkBtn">Comprobar API de Gemini Nano</button>
+      <div id="availStatus" style="font-size: 0.9rem; color: #9ca3af; margin-top: 12px;">Sin comprobar. Haga clic en el botón.</div>
+    </div>
+
+    <div class="grid">
+      <!-- PANEL DE CONFIGURACIÓN -->
+      <div class="panel">
+        <h3>2. Configurar Prueba</h3>
+        
+        <label for="expType">Formato esperado de salida:</label>
+        <select id="expType">
+          <option value="json">JSON Completo (Original)</option>
+          <option value="xml">XML Puro (Sin responseConstraint)</option>
+          <option value="hybrid">Híbrido (JSON con XML adentro)</option>
+        </select>
+
+        <label for="systemPrompt">System Prompt:</label>
+        <textarea id="systemPrompt" rows="9"></textarea>
+
+        <label for="userPrompt">User Prompt:</label>
+        <textarea id="userPrompt" rows="4"></textarea>
+
+        <div class="btn-group">
+          <button id="runBtn" disabled>Ejecutar Prompt (Streaming)</button>
+          <button id="runCompareBtn" disabled style="background-color: var(--highlight);">⚡ Ejecutar Comparativa</button>
+        </div>
+      </div>
+
+      <!-- PANEL DE RESULTADOS EN TIEMPO REAL -->
+      <div class="panel">
+        <h3>3. Resultado del Modelo</h3>
+        <label>Salida en tiempo real:</label>
+        <pre id="outputArea">Esperando ejecución...</pre>
+        
+        <label>Métricas de Rendimiento Individual</label>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div>Tiempo Total</div>
+            <span id="metricTime">-</span>
+          </div>
+          <div class="metric-card">
+            <div>Primer Token (TTFT)</div>
+            <span id="metricFirstToken">-</span>
+          </div>
+          <div class="metric-card">
+            <div>Velocidad Neta</div>
+            <span id="metricSpeed">-</span>
+          </div>
+          <div class="metric-card">
+            <div>Parseo Válido</div>
+            <span id="metricParse">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPARADOR DE BENCHMARKS INDIVIDUAL -->
+    <div class="panel" style="margin-top: 24px;">
+      <h3>📊 Resultados Comparativos de la Prueba</h3>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Formato</th>
+              <th>1er Token (ms)</th>
+              <th>Generación Activa (ms)</th>
+              <th>Tiempo Total (ms)</th>
+              <th>Velocidad (Tok/s)</th>
+              <th>Tamaño (Chars)</th>
+              <th>Parseo</th>
+            </tr>
+          </thead>
+          <tbody id="compareBody">
+            <tr>
+              <td colspan="7" style="padding: 16px; text-align: center; color: #6b7280;">No se han ejecutado pruebas comparativas aún. Haga clic en <strong>⚡ Ejecutar Comparativa</strong>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <label>📋 Resumen JSON para Logs</label>
+        <textarea id="logSummary" rows="6" readonly placeholder="El JSON de resultados del benchmark aparecerá aquí para ser copiado..." style="font-size: 0.8rem; background: #030712; border-color: var(--border);"></textarea>
+        <button id="copyLogBtn" style="margin-top: 12px; background-color: #6366f1; display: none;">📋 Copiar Resumen Técnico</button>
+      </div>
+    </div>
+
+    <!-- SUITE DE PRUEBAS MASIVAS AUTOMATIZADAS -->
+    <div class="panel" style="margin-top: 24px;">
+      <h3>📊 Suite de Pruebas Masivas Automatizadas (45 Corridas)</h3>
+      <p style="color: #9ca3af; margin-top: -6px; font-size: 0.9rem;">Ejecuta secuencialmente 15 casos simulando dictados de voz reales (Fáciles, Medios y Difíciles con cortes de palabras y lagunas) sobre los 3 formatos para calcular promedios robustos.</p>
+      
+      <div class="btn-group" style="margin-bottom: 16px;">
+        <button id="runSuiteBtn" disabled style="background-color: #6366f1; color: #ffffff;">🚀 Iniciar Suite Masiva</button>
+        <button id="stopSuiteBtn" disabled style="background-color: #ef4444; color: #ffffff;">⏹️ Detener Suite</button>
+      </div>
+
+      <div id="suiteStatus" style="font-size: 0.95rem; font-weight: bold; color: var(--accent); margin-bottom: 14px; min-height: 24px;">Esperando inicio...</div>
+      
+      <h4>Promedios Consolidados por Formato</h4>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Formato</th>
+              <th>Promedio TTFT (ms)</th>
+              <th>Promedio Activo (ms)</th>
+              <th>Promedio Total (ms)</th>
+              <th>Promedio Velocidad (Tok/s)</th>
+              <th>Tasa Éxito Parseo</th>
+              <th>Timeouts / Bucles</th>
+            </tr>
+          </thead>
+          <tbody id="suiteSummaryBody">
+            <tr>
+              <td colspan="7" style="padding: 16px; text-align: center; color: #6b7280;">Presiona <strong>Iniciar Suite Masiva</strong> para calcular promedios globales.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <label>📋 JSON Consolidado de la Suite (Logs Completos)</label>
+        <textarea id="suiteLogSummary" rows="6" readonly placeholder="El JSON masivo consolidado aparecerá aquí para ser copiado..." style="font-size: 0.8rem; background: #030712; border-color: var(--border);"></textarea>
+        <button id="copySuiteLogBtn" style="margin-top: 12px; background-color: #6366f1; display: none;">📋 Copiar JSON de la Suite</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const checkBtn = document.getElementById('checkBtn');
+    const runBtn = document.getElementById('runBtn');
+    const runCompareBtn = document.getElementById('runCompareBtn');
+    const runSuiteBtn = document.getElementById('runSuiteBtn');
+    const stopSuiteBtn = document.getElementById('stopSuiteBtn');
+    
+    const expType = document.getElementById('expType');
+    const systemPrompt = document.getElementById('systemPrompt');
+    const userPrompt = document.getElementById('userPrompt');
+    const outputArea = document.getElementById('outputArea');
+    const availStatus = document.getElementById('availStatus');
+
+    const metricTime = document.getElementById('metricTime');
+    const metricFirstToken = document.getElementById('metricFirstToken');
+    const metricSpeed = document.getElementById('metricSpeed');
+    const metricParse = document.getElementById('metricParse');
+
+    const compareBody = document.getElementById('compareBody');
+    const logSummary = document.getElementById('logSummary');
+    const copyLogBtn = document.getElementById('copyLogBtn');
+
+    const suiteStatus = document.getElementById('suiteStatus');
+    const suiteSummaryBody = document.getElementById('suiteSummaryBody');
+    const suiteLogSummary = document.getElementById('suiteLogSummary');
+    const copySuiteLogBtn = document.getElementById('copySuiteLogBtn');
+
+    const TEST_CASES = [
+      // Fáciles
+      { id: "tc_easy_1", difficulty: "Fácil", user: "crear una variable llamada contador igual a cero punto y coma" },
+      { id: "tc_easy_2", difficulty: "Fácil", user: "declarar constante texto igual a comillas hola comillas" },
+      { id: "tc_easy_3", difficulty: "Fácil", user: "imprimir en consola el valor de contador" },
+      { id: "tc_easy_4", difficulty: "Fácil", user: "crear una funcion llamada inicializar vacia" },
+      { id: "tc_easy_5", difficulty: "Fácil", user: "retornar verdadero punto y coma" },
+      // Medios
+      { id: "tc_medium_1", difficulty: "Medio", user: "si notas filtradas punto length es mayor a cero entonces hacer un map" },
+      { id: "tc_medium_2", difficulty: "Medio", user: "crear una funcion flecha llamada filtrar que reciba nota y devuelva nota punto id" },
+      { id: "tc_medium_3", difficulty: "Medio", user: "definir activeClass igual a nota punto id igual igual igual noteActiveId signo de pregunta comillas active comillas dos puntos comillas comillas" },
+      { id: "tc_medium_4", difficulty: "Medio", user: "si noteCount es verdadero entonces cambiar textContent a notasFiltradas punto length" },
+      { id: "tc_medium_5", difficulty: "Medio", user: "crear constante lista igual a un array vacio punto y coma" },
+      // Difíciles (Desaparición de Palabras, Cortes, Silencios y Estiramientos)
+      { id: "tc_hard_1", difficulty: "Difícil", user: "crear constante ... ... no notasFiltradas ... ... noteList punto filter" },
+      { id: "tc_hard_2", difficulty: "Difícil", user: "let contador ... ... ... despues hacer contador mas mas" },
+      { id: "tc_hard_3", difficulty: "Difícil", user: "si active claaaaas ... ... activeClass es igual a ... ... innerHTML igual a vacio" },
+      { id: "tc_hard_4", difficulty: "Difícil", user: "hacer un if de ... ... ... si noteCount existe hacer noteCount punto textContent igual a vacio" },
+      { id: "tc_hard_5", difficulty: "Difícil", user: "const render igual a ... ... arrow function ... ... id" }
+    ];
+
+    const PROMPTS = {
+      json: {
+        system: `You are a technical coding assistant. Return ONLY valid JSON.
+Use exactly this shape: {"think":"","transcript":"","code":""}
+Keep fields in this order: think, transcript, code.
+think: analyze phonetic corrections or ambiguity before writing the code.
+transcript: literal transcript.
+code: isolated programming statement.`,
+        user: `Dictado de voz del usuario: "crear una variable llamada contador igual a 0 punto y coma"`
+      },
+      xml: {
+        system: `You are a technical coding assistant. Return ONLY the content enclosed in XML tags.
+Do not write markdown backticks or prose.
+Use exactly this structure:
+<think>analyze phonetic corrections or ambiguity before writing code</think>
+<transcript>literal transcript of audio</transcript>
+<code>isolated programming statement</code>`,
+        user: `Dictado de voz del usuario: "crear una variable llamada contador igual a 0 punto y coma"`
+      },
+      hybrid: {
+        system: `You are a technical coding assistant. Return ONLY valid JSON.
+Use exactly this shape: {"think":"","payload":""}
+Keep fields in this order: think, payload.
+think: analyze phonetic corrections or ambiguity before writing code.
+payload: Return XML-like tags containing transcript and code, like this:
+<t>literal transcript</t><c>isolated code</c>
+Never escape quotes inside the XML payload.`,
+        user: `Dictado de voz del usuario: "crear una variable llamada contador igual a 0 punto y coma"`
+      }
+    };
+
+    let shouldStopSuite = false;
+
+    // Update fields based on selected format
+    expType.addEventListener('change', () => {
+      const type = expType.value;
+      systemPrompt.value = PROMPTS[type].system;
+      userPrompt.value = PROMPTS[type].user;
+    });
+
+    // Set initial values
+    systemPrompt.value = PROMPTS.json.system;
+    userPrompt.value = PROMPTS.json.user;
+
+    let aiApi = null;
+
+    checkBtn.addEventListener('click', async () => {
+      try {
+        availStatus.textContent = "Comprobando...";
+        if (!("LanguageModel" in window) && !(window.ai?.languageModel)) {
+          availStatus.innerHTML = "<span style='color: #ef4444;'>❌ LanguageModel API no está disponible en este navegador.</span> Asegúrate de usar Chrome v131+ y activar los flags en chrome://flags.";
+          return;
+        }
+
+        const modelApi = window.LanguageModel || window.ai.languageModel;
+        const availability = await modelApi.availability();
+        availStatus.innerHTML = `Model availability: <strong>${availability}</strong>`;
+        
+        if (availability === "available" || availability === "downloadable") {
+          runBtn.disabled = false;
+          runCompareBtn.disabled = false;
+          runSuiteBtn.disabled = false;
+          aiApi = modelApi;
+          availStatus.innerHTML += " <span style='color: #22c55e;'>(¡Listo para ejecutar!)</span>";
+        } else {
+          availStatus.innerHTML += " <span style='color: #eab308;'>(El modelo no se puede usar todavía)</span>";
+        }
+      } catch (err) {
+        availStatus.innerHTML = `<span style='color: #ef4444;'>Error: ${err.message}</span>`;
+      }
+    });
+
+    // Smart streaming helper that accumulates correctly and protects timeouts
+    async function runSingleFormat(type, sysContent, userContent) {
+      outputArea.textContent = `[${type.toUpperCase()}] Inicializando sesión...`;
+      
+      const sessionOptions = {
+        temperature: 0.3,
+        topK: 3,
+        initialPrompts: [
+          { role: "system", content: sysContent }
+        ]
+      };
+
+      if (type === 'json') {
+        sessionOptions.responseConstraint = {
+          type: "object",
+          required: ["think", "transcript", "code"],
+          properties: {
+            think: { type: "string" },
+            transcript: { type: "string" },
+            code: { type: "string" }
+          }
+        };
+      } else if (type === 'hybrid') {
+        sessionOptions.responseConstraint = {
+          type: "object",
+          required: ["think", "payload"],
+          properties: {
+            think: { type: "string" },
+            payload: { type: "string" }
+          }
+        };
+      }
+
+      const session = await aiApi.create(sessionOptions);
+      outputArea.textContent = `[${type.toUpperCase()}] Conectado...`;
+
+      const startTime = performance.now();
+      let firstTokenTime = null;
+      let responseText = "";
+
+      const stream = session.promptStreaming(userContent);
+      
+      for await (const chunk of stream) {
+        if (shouldStopSuite) {
+          session.destroy();
+          throw new Error("Abortado por el usuario");
+        }
+        if (performance.now() - startTime > 12000) { // 12 seconds protection limit
+          session.destroy();
+          throw new Error("Límite de tiempo excedido (12s) - Posible bucle cognitivo");
+        }
+        if (!firstTokenTime) {
+          firstTokenTime = performance.now();
+        }
+        const chunkStr = String(chunk);
+        // Smart accumulation: if cumulative, use chunkStr. Otherwise append.
+        responseText = chunkStr.startsWith(responseText) ? chunkStr : responseText + chunkStr;
+        outputArea.textContent = responseText;
+      }
+
+      const endTime = performance.now();
+      const totalDuration = endTime - startTime;
+      const firstTokenDuration = firstTokenTime ? (firstTokenTime - startTime) : 0;
+      const activeDurationMs = Math.max(1, totalDuration - firstTokenDuration);
+      
+      const charCount = responseText.length;
+      const estTokens = charCount / 4;
+      const tokensPerSec = estTokens / (activeDurationMs / 1000);
+
+      let parseOk = false;
+      let parseStatus = "No";
+      if (type === 'json' || type === 'hybrid') {
+        let cleanText = responseText.trim();
+        if (cleanText.startsWith("```")) {
+          cleanText = cleanText.replace(/^```[a-zA-Z]*\s*/, "");
+          cleanText = cleanText.replace(/\s*```$/, "");
+        }
+        try {
+          JSON.parse(cleanText);
+          parseOk = true;
+          parseStatus = "✅ JSON Válido";
+        } catch {
+          parseStatus = "❌ JSON Roto";
+        }
+      } else {
+        const hasThink = responseText.includes('<think>') && responseText.includes('</think>');
+        const hasTrans = responseText.includes('<transcript>') && responseText.includes('</transcript>');
+        const hasCode = responseText.includes('<code>') && responseText.includes('</code>');
+        parseOk = (hasThink && hasTrans && hasCode);
+        parseStatus = parseOk ? "✅ XML Válido" : "❌ XML Roto";
+      }
+
+      // Update UI metric cards dynamically in real-time
+      metricTime.textContent = `${Math.round(totalDuration)} ms`;
+      metricFirstToken.textContent = `${Math.round(firstTokenDuration)} ms`;
+      metricSpeed.textContent = `${tokensPerSec.toFixed(1)} t/s (est)`;
+      metricParse.textContent = parseStatus;
+
+      session.destroy();
+
+      return {
+        format: type,
+        firstTokenMs: Math.round(firstTokenDuration),
+        activeMs: Math.round(activeDurationMs),
+        totalMs: Math.round(totalDuration),
+        tokensPerSec: parseFloat(tokensPerSec.toFixed(1)),
+        charCount,
+        parseOk,
+        parseStatus,
+        text: responseText
+      };
+    }
+
+    runBtn.addEventListener('click', async () => {
+      if (!aiApi) return;
+      runBtn.disabled = true;
+      runCompareBtn.disabled = true;
+      runSuiteBtn.disabled = true;
+      
+      metricTime.textContent = "-";
+      metricFirstToken.textContent = "-";
+      metricSpeed.textContent = "-";
+      metricParse.textContent = "-";
+
+      const type = expType.value;
+      const sysContent = systemPrompt.value;
+      const userContent = userPrompt.value;
+
+      try {
+        await runSingleFormat(type, sysContent, userContent);
+      } catch (err) {
+        outputArea.textContent = `Error durante ejecución: ${err.message}`;
+      } finally {
+        runBtn.disabled = false;
+        runCompareBtn.disabled = false;
+        runSuiteBtn.disabled = false;
+      }
+    });
+
+    runCompareBtn.addEventListener('click', async () => {
+      if (!aiApi) return;
+      runBtn.disabled = true;
+      runCompareBtn.disabled = true;
+      runSuiteBtn.disabled = true;
+      compareBody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--accent);">Ejecutando comparativa... Por favor espera.</td></tr>`;
+      logSummary.value = "";
+      copyLogBtn.style.display = "none";
+
+      const results = [];
+      const formats = ['json', 'xml', 'hybrid'];
+
+      try {
+        for (const fmt of formats) {
+          const sysContent = PROMPTS[fmt].system;
+          const userContent = PROMPTS[fmt].user;
+          
+          const result = await runSingleFormat(fmt, sysContent, userContent);
+          results.push(result);
+          
+          await new Promise(r => setTimeout(r, 600)); // Cool down
+        }
+
+        renderTable(results);
+
+        const summaryData = {
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          chromeVersion: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1] || "unknown",
+          benchmarks: results.map(r => ({
+            format: r.format,
+            ttft_ms: r.firstTokenMs,
+            generation_ms: r.activeMs,
+            total_ms: r.totalMs,
+            tokens_per_sec: r.tokensPerSec,
+            chars: r.charCount,
+            parse_ok: r.parseOk,
+            response_sample: r.text.slice(0, 150) + (r.text.length > 150 ? "..." : "")
+          }))
+        };
+
+        logSummary.value = JSON.stringify(summaryData, null, 2);
+        localStorage.setItem('duck_sugar_benchmarks_xml', JSON.stringify(summaryData));
+        copyLogBtn.style.display = "inline-block";
+
+      } catch (err) {
+        compareBody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: #ef4444;">Error en comparativa: ${err.message}</td></tr>`;
+      } finally {
+        runBtn.disabled = false;
+        runCompareBtn.disabled = false;
+        runSuiteBtn.disabled = false;
+      }
+    });
+
+    function renderTable(results) {
+      compareBody.innerHTML = "";
+      results.forEach(res => {
+        let rowColor = "";
+        if (res.format === 'json') rowColor = "color: #38bdf8;";
+        else if (res.format === 'xml') rowColor = "color: #f59e0b;";
+        else if (res.format === 'hybrid') rowColor = "color: #10b981;";
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding: 10px 12px; font-weight: bold; ${rowColor}">${res.format.toUpperCase()}</td>
+          <td style="padding: 10px 12px;">${res.firstTokenMs} ms</td>
+          <td style="padding: 10px 12px;">${res.activeMs} ms</td>
+          <td style="padding: 10px 12px;">${res.totalMs} ms</td>
+          <td style="padding: 10px 12px; font-weight: bold;">${res.tokensPerSec} t/s</td>
+          <td style="padding: 10px 12px;">${res.charCount}</td>
+          <td style="padding: 10px 12px;">${res.parseStatus}</td>
+        `;
+        compareBody.appendChild(tr);
+      });
+    }
+
+    copyLogBtn.addEventListener('click', () => {
+      logSummary.select();
+      document.execCommand('copy');
+      const originalText = copyLogBtn.textContent;
+      copyLogBtn.textContent = "✅ ¡Copiado!";
+      setTimeout(() => {
+        copyLogBtn.textContent = originalText;
+      }, 2000);
+    });
+
+    // SUITE MASIVA RUNNER & STATS
+    stopSuiteBtn.addEventListener('click', () => {
+      shouldStopSuite = true;
+      stopSuiteBtn.disabled = true;
+      suiteStatus.textContent = "Cancelando suite en la próxima corrida...";
+    });
+
+    runSuiteBtn.addEventListener('click', async () => {
+      if (!aiApi) return;
+      shouldStopSuite = false;
+      
+      runBtn.disabled = true;
+      runCompareBtn.disabled = true;
+      runSuiteBtn.disabled = true;
+      stopSuiteBtn.disabled = false;
+      
+      suiteSummaryBody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--accent);">Inicializando suite masiva...</td></tr>`;
+      suiteLogSummary.value = "";
+      copySuiteLogBtn.style.display = "none";
+
+      const suiteRuns = [];
+      const formats = ['json', 'xml', 'hybrid'];
+      const totalSteps = TEST_CASES.length * formats.length;
+      let currentStep = 0;
+
+      try {
+        for (let i = 0; i < TEST_CASES.length; i++) {
+          const testCase = TEST_CASES[i];
+          
+          for (const fmt of formats) {
+            if (shouldStopSuite) {
+              throw new Error("Ejecución cancelada voluntariamente.");
+            }
+            
+            currentStep++;
+            suiteStatus.innerHTML = `Ejecutando: <strong>Caso ${i + 1}/15 (${testCase.difficulty})</strong> - Formato: <strong style="color: var(--accent);">${fmt.toUpperCase()}</strong> [Paso ${currentStep}/${totalSteps}]`;
+            
+            const sysContent = PROMPTS[fmt].system;
+            const userContent = `Contexto IDE: { "activeFile": "app.js", "noteActiveId": "note-1", "notesFiltradas": [], "noteList": {}, "noteCount": {} }\n` +
+                                `Audio transcrito: "${testCase.user}"`;
+
+            let runResult;
+            try {
+              runResult = await runSingleFormat(fmt, sysContent, userContent);
+              runResult.caseId = testCase.id;
+              runResult.difficulty = testCase.difficulty;
+              runResult.timeout = false;
+            } catch (err) {
+              console.error(`Error en caso ${testCase.id} [${fmt}]:`, err);
+              runResult = {
+                format: fmt,
+                caseId: testCase.id,
+                difficulty: testCase.difficulty,
+                firstTokenMs: 0,
+                activeMs: 0,
+                totalMs: 0,
+                tokensPerSec: 0,
+                charCount: 0,
+                parseOk: false,
+                parseStatus: err.message.includes("Límite de tiempo") ? "❌ Timeout (12s)" : "❌ Error",
+                timeout: true,
+                text: ""
+              };
+            }
+            
+            suiteRuns.push(runResult);
+            await new Promise(r => setTimeout(r, 500)); // Cool down
+          }
+        }
+
+        suiteStatus.textContent = "✅ ¡Suite Masiva completada con éxito!";
+        renderSuiteSummary(suiteRuns);
+
+      } catch (err) {
+        suiteStatus.textContent = `❌ Interrumpido: ${err.message}`;
+      } finally {
+        runBtn.disabled = false;
+        runCompareBtn.disabled = false;
+        runSuiteBtn.disabled = false;
+        stopSuiteBtn.disabled = true;
+      }
+    });
+
+    function renderSuiteSummary(runs) {
+      const formats = ['json', 'xml', 'hybrid'];
+      const stats = {};
+
+      formats.forEach(fmt => {
+        const fmtRuns = runs.filter(r => r.format === fmt);
+        const validRuns = fmtRuns.filter(r => !r.timeout);
+        const parsedRuns = fmtRuns.filter(r => r.parseOk);
+        const timeoutRuns = fmtRuns.filter(r => r.timeout);
+
+        const avgTtft = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.firstTokenMs, 0) / validRuns.length : 0;
+        const avgActive = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.activeMs, 0) / validRuns.length : 0;
+        const avgTotal = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.totalMs, 0) / validRuns.length : 0;
+        const avgSpeed = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.tokensPerSec, 0) / validRuns.length : 0;
+
+        stats[fmt] = {
+          avgTtft: Math.round(avgTtft),
+          avgActive: Math.round(avgActive),
+          avgTotal: Math.round(avgTotal),
+          avgSpeed: parseFloat(avgSpeed.toFixed(1)),
+          parseRate: parseFloat(((parsedRuns.length / fmtRuns.length) * 100).toFixed(1)),
+          failures: timeoutRuns.length
+        };
+      });
+
+      suiteSummaryBody.innerHTML = "";
+      formats.forEach(fmt => {
+        const res = stats[fmt];
+        let rowColor = "";
+        if (fmt === 'json') rowColor = "color: #38bdf8;";
+        else if (fmt === 'xml') rowColor = "color: #f59e0b;";
+        else if (fmt === 'hybrid') rowColor = "color: #10b981;";
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding: 10px 12px; font-weight: bold; ${rowColor}">${fmt.toUpperCase()}</td>
+          <td style="padding: 10px 12px;">${res.avgTtft} ms</td>
+          <td style="padding: 10px 12px;">${res.avgActive} ms</td>
+          <td style="padding: 10px 12px;">${res.avgTotal} ms</td>
+          <td style="padding: 10px 12px; font-weight: bold;">${res.avgSpeed} t/s</td>
+          <td style="padding: 10px 12px; font-weight: bold; color: ${res.parseRate >= 90 ? 'var(--highlight)' : 'var(--warning)'};">${res.parseRate}%</td>
+          <td style="padding: 10px 12px; color: ${res.failures > 0 ? '#ef4444' : 'var(--text)'};">${res.failures}</td>
+        `;
+        suiteSummaryBody.appendChild(tr);
+      });
+
+      const suitePayload = {
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        chromeVersion: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1] || "unknown",
+        summary: stats,
+        runs: runs.map(r => ({
+          format: r.format,
+          caseId: r.caseId,
+          difficulty: r.difficulty,
+          ttft_ms: r.firstTokenMs,
+          generation_ms: r.activeMs,
+          total_ms: r.totalMs,
+          tokens_per_sec: r.tokensPerSec,
+          chars: r.charCount,
+          parse_ok: r.parseOk,
+          parseStatus: r.parseStatus,
+          text_sample: r.text.slice(0, 150) + (r.text.length > 150 ? "..." : "")
+        }))
+      };
+
+      suiteLogSummary.value = JSON.stringify(suitePayload, null, 2);
+      localStorage.setItem('duck_sugar_bulk_benchmarks', JSON.stringify(suitePayload));
+      copySuiteLogBtn.style.display = "inline-block";
+    }
+
+    copySuiteLogBtn.addEventListener('click', () => {
+      suiteLogSummary.select();
+      document.execCommand('copy');
+      const originalText = copySuiteLogBtn.textContent;
+      copySuiteLogBtn.textContent = "✅ ¡Copiado!";
+      setTimeout(() => {
+        copySuiteLogBtn.textContent = originalText;
+      }, 2000);
+    });
+
+    // Restore benchmarks on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const past = localStorage.getItem('duck_sugar_benchmarks_xml');
+      if (past) {
+        try {
+          const data = JSON.parse(past);
+          logSummary.value = JSON.stringify(data, null, 2);
+          copyLogBtn.style.display = "inline-block";
+          
+          const formattedList = data.benchmarks.map(b => ({
+            format: b.format,
+            firstTokenMs: b.ttft_ms,
+            activeMs: b.generation_ms,
+            totalMs: b.total_ms,
+            tokensPerSec: b.tokens_per_sec,
+            charCount: b.chars,
+            parseStatus: b.parse_ok ? "✅ Sí" : "❌ No"
+          }));
+          renderTable(formattedList);
+        } catch (e) {
+          console.error("Error restoring benchmark metrics:", e);
+        }
+      }
+
+      // Restore past suite benchmarks on load
+      const pastSuite = localStorage.getItem('duck_sugar_bulk_benchmarks');
+      if (pastSuite) {
+        try {
+          const data = JSON.parse(pastSuite);
+          suiteLogSummary.value = JSON.stringify(data, null, 2);
+          copySuiteLogBtn.style.display = "inline-block";
+          
+          suiteSummaryBody.innerHTML = "";
+          const formats = ['json', 'xml', 'hybrid'];
+          formats.forEach(fmt => {
+            const res = data.summary[fmt];
+            let rowColor = "";
+            if (fmt === 'json') rowColor = "color: #38bdf8;";
+            else if (fmt === 'xml') rowColor = "color: #f59e0b;";
+            else if (fmt === 'hybrid') rowColor = "color: #10b981;";
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td style="padding: 10px 12px; font-weight: bold; ${rowColor}">${fmt.toUpperCase()}</td>
+              <td style="padding: 10px 12px;">${res.avgTtft} ms</td>
+              <td style="padding: 10px 12px;">${res.avgActive} ms</td>
+              <td style="padding: 10px 12px;">${res.avgTotal} ms</td>
+              <td style="padding: 10px 12px; font-weight: bold;">${res.avgSpeed} t/s</td>
+              <td style="padding: 10px 12px; font-weight: bold; color: ${res.parseRate >= 90 ? 'var(--highlight)' : 'var(--warning)'};">${res.parseRate}%</td>
+              <td style="padding: 10px 12px; color: ${res.failures > 0 ? '#ef4444' : 'var(--text)'};">${res.failures}</td>
+            `;
+            suiteSummaryBody.appendChild(tr);
+          });
+        } catch (e) {
+          console.error("Error restoring bulk benchmark metrics:", e);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

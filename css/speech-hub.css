@@ -1,0 +1,253 @@
+/* ── Recording Controls & Buttons ────────────────── */
+
+#recordButton:not(:disabled) {
+  background: hsla(0, 84%, 60%, 0.12);
+  border-color: hsla(0, 84%, 60%, 0.35);
+  color: var(--record-text);
+  border-radius: 12px;
+  min-height: 42px;
+}
+
+#recordButton:not(:disabled):hover {
+  background: hsla(0, 84%, 60%, 0.22);
+  border-color: hsla(0, 84%, 60%, 0.55);
+  box-shadow: 0 6px 18px hsla(0, 84%, 60%, 0.25);
+}
+
+#recordButton.recording {
+  background: hsla(0, 84%, 60%, 0.3);
+  border-color: hsla(0, 84%, 60%, 0.7);
+  color: #fff;
+  animation: recording-pulse 1.5s ease-in-out infinite;
+  transform: scale(1.02);
+}
+
+#recordButton.recording .btn-icon {
+  color: var(--error-color);
+  animation: recording-dot 1s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%, 100% { box-shadow: 0 0 10px hsla(0, 84%, 60%, 0.25); }
+  50% { box-shadow: 0 0 25px hsla(0, 84%, 60%, 0.5), 0 0 45px hsla(0, 84%, 60%, 0.2); }
+}
+
+@keyframes recording-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
+}
+
+#stopButton {
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+#stopButton:not(:disabled) {
+  background: hsla(15, 80%, 55%, 0.12);
+  border-color: hsla(15, 80%, 55%, 0.35);
+  color: hsl(15, 80%, 80%);
+}
+
+#stopButton:not(:disabled):hover {
+  background: hsla(15, 80%, 55%, 0.22);
+  border-color: hsla(15, 80%, 55%, 0.55);
+  box-shadow: 0 6px 18px hsla(15, 80%, 55%, 0.25);
+}
+
+/* ── Speech Hub Controls Row Layouts ─────────────── */
+
+.speech-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  width: 100%;
+}
+
+.speech-controls-row button {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+.speech-controls-row .lang-select {
+  flex: 1.2;
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.speech-file-row {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  margin-top: 18px;
+  margin-bottom: 12px;
+}
+
+.file-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.file-input-wrapper label {
+  margin: 0;
+}
+
+/* ── Send Action Button ──────────────────────────── */
+
+.btn-send-audio {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, hsl(240, 75%, 65%) 0%, hsl(265, 80%, 60%) 100%) !important;
+  border: 1px solid hsla(240, 75%, 65%, 0.4) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 24px hsla(240, 75%, 65%, 0.25), inset 0 2px 4px rgba(255, 255, 255, 0.2) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.btn-send-audio:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px hsla(240, 75%, 65%, 0.4), 0 0 15px var(--accent-glow) !important;
+  background: linear-gradient(135deg, hsl(240, 80%, 70%) 0%, hsl(265, 85%, 65%) 100%) !important;
+}
+
+.btn-send-audio:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-send-audio:disabled {
+  background: hsla(240, 16%, 10%, 0.45) !important;
+  border-color: var(--panel-border) !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+  opacity: 0.4 !important;
+  cursor: not-allowed;
+}
+
+/* ── Transcription Real-Time Box ─────────────────── */
+
+.transcription-area {
+  min-height: 120px;
+  padding: 14px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-main);
+  overflow-y: auto;
+  max-height: 240px;
+  transition: all 0.25s ease;
+  word-wrap: break-word;
+}
+
+.transcription-area .final-text {
+  color: hsl(150, 84%, 75%); /* Verde esmeralda premium para texto final consolidado */
+  font-weight: 500;
+}
+
+.transcription-area .interim-text {
+  color: hsl(210, 20%, 55%); /* Gris difuminado intermedio para texto en progreso */
+  font-style: italic;
+}
+
+.transcription-area .placeholder-text {
+  color: hsla(215, 15%, 65%, 0.35);
+  font-style: italic;
+}
+
+.transcription-area:focus {
+  outline: none;
+  border-color: var(--success-color);
+  box-shadow: 0 0 12px hsla(150, 84%, 55%, 0.25);
+  background: hsla(222, 47%, 4%, 0.95);
+}
+
+/* ── Wave Visualizer and Canvas ──────────────────── */
+
+.waveform-container {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: hsla(222, 47%, 10%, 0.7);
+  border: 1px solid var(--panel-border);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#waveformCanvas {
+  width: 100%;
+  height: 72px;
+  display: block;
+  cursor: pointer;
+}
+
+/* ── Audio box details ───────────────────────────── */
+
+.audioBox {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 20px;
+  background: hsla(240, 16%, 8%, 0.3);
+  border-radius: 16px;
+  border: 1px dashed var(--input-border);
+}
+
+.audio-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.audio-controls-row button {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#recordingState {
+  color: var(--accent-color);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Audio Digital Precision Time badge ──────────── */
+
+.audio-time-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background: hsla(222, 47%, 4%, 0.85);
+  border: 1px solid hsla(240, 50%, 60%, 0.2);
+  border-radius: 8px;
+  font-family: 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--success-color); /* Neon emerald color for high precision timeline */
+  text-shadow: 0 0 6px hsla(150, 84%, 55%, 0.35);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  letter-spacing: -0.2px;
+}

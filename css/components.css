@@ -1,0 +1,382 @@
+/* ── Status badge ────────────────────────────────── */
+
+.status {
+  min-width: 190px;
+  padding: 10px 20px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  border-radius: 9999px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.status.ready {
+  border-color: hsla(150, 84%, 55%, 0.35);
+  color: var(--success-color);
+  background: var(--success-bg);
+  box-shadow: 0 0 20px hsla(150, 84%, 55%, 0.15);
+  animation: status-pulse 2.5s ease-in-out infinite;
+}
+
+.status.bad {
+  border-color: hsla(0, 84%, 60%, 0.35);
+  color: var(--error-color);
+  background: var(--error-bg);
+  box-shadow: 0 0 20px hsla(0, 84%, 60%, 0.15);
+}
+
+@keyframes status-pulse {
+  0%, 100% { box-shadow: 0 0 15px hsla(150, 84%, 55%, 0.1); }
+  50% { box-shadow: 0 0 25px hsla(150, 84%, 55%, 0.25); }
+}
+
+/* ── Toolbar ─────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 0 32px;
+  align-items: flex-end;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--toolbar-divider);
+  border-radius: 16px;
+  background: hsla(222, 47%, 8%, 0.4);
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.toolbar-group::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -8px;
+  left: 14px;
+  padding: 0 8px;
+  background: var(--bg-color);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+}
+
+/* ── Generic Buttons ─────────────────────────────── */
+
+button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: hsla(220, 20%, 15%, 0.6);
+  color: var(--text-main);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+  background: hsla(220, 20%, 8%, 0.4);
+  border-color: hsla(0, 0%, 100%, 0.03);
+  box-shadow: none;
+}
+
+button:not(:disabled):hover {
+  background: hsla(240, 50%, 30%, 0.4);
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px var(--accent-glow);
+}
+
+button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.btn-icon {
+  display: inline-block;
+  font-size: 10px;
+}
+
+/* ── Lang Select Styling ────────────────────────── */
+
+.lang-select {
+  min-height: 38px;
+  padding: 0 12px;
+  background: hsla(222, 47%, 8%, 0.7);
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.lang-select:hover {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.lang-select option {
+  background: var(--bg-color);
+  color: var(--text-main);
+}
+
+/* ── Progress bar ────────────────────────────────── */
+
+.progress-bar {
+  position: relative;
+  height: 28px;
+  margin-bottom: 32px;
+  border-radius: 14px;
+  background: hsla(222, 47%, 8%, 0.5);
+  border: 1px solid var(--panel-border);
+  overflow: hidden;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.progress-bar[hidden] {
+  display: none;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+  border-radius: 14px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Toast notification ──────────────────────────── */
+
+.toast {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  padding: 14px 24px;
+  background: hsla(240, 16%, 10%, 0.95);
+  border: 1px solid var(--accent-color);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #e2e8f0;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 20px var(--accent-glow);
+  transform: translateY(120%);
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ── Metrics cards ───────────────────────────────── */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.metric {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.metric:hover {
+  border-color: var(--accent-color);
+  background: hsla(222, 47%, 8%, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
+
+.metric span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #fff;
+  font-size: 16px;
+  font-family: 'Fira Code', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Pre-Wrapper & Copy Button (Fase 9) ── */
+
+.pre-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: hsla(240, 16%, 10%, 0.85);
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: all 0.2s ease;
+}
+
+.pre-copy-btn:hover {
+  background: hsla(240, 50%, 30%, 0.6) !important;
+  border-color: var(--accent-color) !important;
+  color: #fff !important;
+  transform: scale(1.03) !important;
+  box-shadow: 0 4px 12px var(--accent-glow) !important;
+}
+
+.pre-copy-btn.copied {
+  background: hsla(150, 84%, 55%, 0.15) !important;
+  border-color: var(--success-color) !important;
+  color: var(--success-color) !important;
+}
+
+/* ── Empathy Aura & Avatar ───────────────────────── */
+
+.header-logo-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.empathy-aura-container {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: hsla(220, 20%, 15%, 0.6);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.duck-avatar {
+  font-size: 28px;
+  line-height: 1;
+  z-index: 2;
+  user-select: none;
+}
+
+.empathy-aura {
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  z-index: 1;
+  opacity: 0.85;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+/* 🧘 Calma: Aura verde esmeralda respiratoria suave */
+.empathy-aura.aura-calm {
+  background: radial-gradient(circle, hsla(150, 84%, 55%, 0.15) 0%, transparent 70%);
+  border: 1.5px solid hsla(150, 84%, 55%, 0.3);
+  box-shadow: 0 0 20px hsla(150, 84%, 55%, 0.2);
+  animation: aura-breathe-calm 3s ease-in-out infinite;
+}
+
+/* ⚡ Enfocado/Enérgico: Aura cian eléctrica de alta intensidad */
+.empathy-aura.aura-focus {
+  background: radial-gradient(circle, hsla(180, 100%, 50%, 0.25) 0%, transparent 70%);
+  border: 1.5px solid hsla(180, 100%, 50%, 0.5);
+  box-shadow: 0 0 25px hsla(180, 100%, 50%, 0.4);
+  animation: aura-breathe-focus 1.5s ease-in-out infinite;
+}
+
+/* 🧠 Duda/Cansancio: Aura índigo/violeta espacial reflexiva */
+.empathy-aura.aura-tired {
+  background: radial-gradient(circle, hsla(260, 100%, 65%, 0.2) 0%, transparent 70%);
+  border: 1.5px solid hsla(260, 100%, 65%, 0.4);
+  box-shadow: 0 0 20px hsla(260, 100%, 65%, 0.3);
+  animation: aura-breathe-tired 4s ease-in-out infinite;
+}
+
+/* 🌋 Estrés/Frustración: Aura ámbar cálida/anaranjada tranquilizante */
+.empathy-aura.aura-frustrated {
+  background: radial-gradient(circle, hsla(30, 100%, 55%, 0.25) 0%, transparent 70%);
+  border: 1.5px solid hsla(30, 100%, 55%, 0.5);
+  box-shadow: 0 0 25px hsla(30, 100%, 55%, 0.4);
+  animation: aura-breathe-frustrated 2s ease-in-out infinite;
+}
+
+@keyframes aura-breathe-calm {
+  0%, 100% { transform: scale(1); opacity: 0.7; box-shadow: 0 0 15px hsla(150, 84%, 55%, 0.15); }
+  50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 30px hsla(150, 84%, 55%, 0.4); }
+}
+
+@keyframes aura-breathe-focus {
+  0%, 100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px hsla(180, 100%, 50%, 0.3); }
+  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 35px hsla(180, 100%, 50%, 0.6); }
+}
+
+@keyframes aura-breathe-tired {
+  0%, 100% { transform: scale(1); opacity: 0.6; box-shadow: 0 0 12px hsla(260, 100%, 65%, 0.2); }
+  50% { transform: scale(1.1); opacity: 0.85; box-shadow: 0 0 24px hsla(260, 100%, 65%, 0.45); }
+}
+
+@keyframes aura-breathe-frustrated {
+  0%, 100% { transform: scale(1); opacity: 0.75; box-shadow: 0 0 18px hsla(30, 100%, 55%, 0.3); }
+  50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 32px hsla(30, 100%, 55%, 0.55); }
+}

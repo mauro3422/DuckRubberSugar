@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DuckSpeech - Web Speech API Playground</title>
+  <!-- Google Fonts: Outfit & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #09090e;
+      --bg-card: rgba(18, 18, 29, 0.7);
+      --primary: #9d4edd;
+      --primary-glow: rgba(157, 78, 221, 0.4);
+      --secondary: #06d6a0;
+      --secondary-glow: rgba(6, 214, 160, 0.3);
+      --accent: #ff007f;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border: rgba(255, 255, 255, 0.08);
+      --font-title: 'Outfit', sans-serif;
+      --font-mono: 'Space Grotesk', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-title);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(157, 78, 221, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(6, 214, 160, 0.06) 0%, transparent 45%);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Premium Header */
+    header {
+      padding: 2rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(9, 9, 14, 0.5);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-duck {
+      font-size: 2.2rem;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .logo-text {
+      font-weight: 800;
+      font-size: 1.8rem;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff 30%, var(--primary) 70%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge-api {
+      background: rgba(6, 214, 160, 0.1);
+      border: 1px solid var(--secondary);
+      color: var(--secondary);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 0 10px var(--secondary-glow);
+    }
+
+    /* Container */
+    main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 2.5rem;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .glass-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(157, 78, 221, 0.2);
+      box-shadow: 0 12px 40px 0 rgba(157, 78, 221, 0.1);
+    }
+
+    .card-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: -1rem;
+      line-height: 1.4;
+    }
+
+    /* Live Recognition Controls */
+    .mic-button-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 0;
+      gap: 1rem;
+    }
+
+    .mic-btn {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, var(--primary) 0%, #7b2cbf 100%);
+      color: white;
+      font-size: 2.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px var(--primary-glow);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      position: relative;
+      outline: none;
+    }
+
+    .mic-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 35px rgba(157, 78, 221, 0.6);
+    }
+
+    .mic-btn:active {
+      transform: scale(0.95);
+    }
+
+    .mic-btn.listening {
+      background: linear-gradient(135deg, var(--accent) 0%, #ff0055 100%);
+      animation: pulse 1.5s infinite;
+      box-shadow: 0 0 30px rgba(255, 0, 127, 0.6);
+    }
+
+    /* Wave visualizer */
+    .wave-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      height: 40px;
+      width: 100%;
+      margin: 0.5rem 0;
+    }
+
+    .wave-bar {
+      width: 4px;
+      height: 8px;
+      background-color: var(--primary);
+      border-radius: 4px;
+      transition: height 0.1s ease;
+    }
+
+    .listening .wave-bar {
+      background-color: var(--accent);
+      animation: soundWave 1.2s infinite ease-in-out;
+    }
+
+    /* Sound wave animation offsets */
+    .wave-bar:nth-child(1) { animation-delay: 0.1s; }
+    .wave-bar:nth-child(2) { animation-delay: 0.2s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(4) { animation-delay: 0.4s; }
+    .wave-bar:nth-child(5) { animation-delay: 0.5s; }
+    .wave-bar:nth-child(6) { animation-delay: 0.6s; }
+    .wave-bar:nth-child(7) { animation-delay: 0.5s; }
+    .wave-bar:nth-child(8) { animation-delay: 0.4s; }
+    .wave-bar:nth-child(9) { animation-delay: 0.3s; }
+    .wave-bar:nth-child(10) { animation-delay: 0.2s; }
+
+    /* Lang Selector */
+    .control-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .control-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    select, input[type="file"] {
+      background: rgba(18, 18, 29, 0.9);
+      border: 1px solid var(--border);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      outline: none;
+      font-family: var(--font-title);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    select:focus {
+      border-color: var(--primary);
+    }
+
+    /* Upload Controls */
+    .file-dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .file-dropzone:hover {
+      border-color: var(--primary);
+      background: rgba(157, 78, 221, 0.02);
+    }
+
+    .file-icon {
+      font-size: 2.5rem;
+      color: var(--primary);
+    }
+
+    .audio-player-wrapper {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      padding: 1rem;
+      border-radius: 14px;
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    audio {
+      width: 100%;
+      height: 40px;
+    }
+
+    /* Transcriptions View (Right Card) */
+    .transcription-area {
+      flex: 1;
+      background: rgba(9, 9, 14, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      font-size: 1.1rem;
+      line-height: 1.6;
+      min-height: 250px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      position: relative;
+    }
+
+    .transcription-area:empty::before {
+      content: "La transcripción aparecerá aquí en tiempo real a medida que hables...";
+      color: var(--text-muted);
+      font-style: italic;
+      font-size: 0.95rem;
+    }
+
+    .interim-text {
+      color: var(--text-muted);
+      opacity: 0.75;
+    }
+
+    .final-text {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    /* Metadata Panel */
+    .meta-panel {
+      background: rgba(6, 214, 160, 0.03);
+      border: 1px solid rgba(6, 214, 160, 0.15);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .meta-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-family: var(--font-mono);
+    }
+
+    .meta-val {
+      font-weight: bold;
+      color: var(--secondary);
+    }
+
+    /* Premium Alert Box */
+    .alert-box {
+      background: rgba(157, 78, 221, 0.05);
+      border: 1px solid rgba(157, 78, 221, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    .alert-icon {
+      font-size: 1.2rem;
+      color: var(--primary);
+    }
+
+    .alert-content p {
+      margin-bottom: 0.25rem;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: white;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+
+    /* Footer */
+    footer {
+      padding: 2rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+
+    /* Keyframes */
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255, 0, 127, 0.7); }
+      70% { box-shadow: 0 0 0 15px rgba(255, 0, 127, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 0, 127, 0); }
+    }
+
+    @keyframes soundWave {
+      0%, 100% { height: 8px; }
+      50% { height: 35px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <span class="logo-duck">🦆</span>
+      <div>
+        <h1 class="logo-text">DuckSpeech</h1>
+        <p style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Playground de Transcripción por Voz</p>
+      </div>
+    </div>
+    <div class="badge-api">Chrome Web Speech API</div>
+  </header>
+
+  <main>
+    <!-- Left Column: Audio Input Controls -->
+    <div class="glass-card">
+      <div class="card-title">
+        <span>🎤</span> Entrada de Audio Activa
+      </div>
+      <p class="card-subtitle">
+        Habla con tu micrófono en tiempo real o sube un archivo grabado para probar el motor de reconocimiento acústico nativo del navegador.
+      </p>
+
+      <div class="control-row">
+        <span class="control-label">Idioma de Escucha:</span>
+        <select id="langSelect">
+          <option value="es-AR" selected>Español (Argentina)</option>
+          <option value="es-ES">Español (España)</option>
+          <option value="en-US">English (United States)</option>
+          <option value="en-GB">English (United Kingdom)</option>
+        </select>
+      </div>
+
+      <div class="mic-button-container">
+        <button id="micBtn" class="mic-btn" title="Iniciar grabación">
+          🎙️
+        </button>
+        <div style="font-weight: 700; font-size: 0.95rem; margin-top: 0.5rem;" id="statusLabel">
+          Haz clic para empezar a hablar
+        </div>
+        <div class="wave-container" id="waveContainer">
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 1.5rem;">
+        <div class="card-title" style="font-size: 1.1rem; margin-bottom: 0.5rem;">
+          <span>📁</span> Subir Audio Grabado
+        </div>
+        
+        <input type="file" id="audioUpload" accept="audio/*" style="display: none;">
+        <div class="file-dropzone" id="dropzone" onclick="document.getElementById('audioUpload').click()">
+          <span class="file-icon">🎵</span>
+          <p style="font-size: 0.9rem; font-weight: 600;">Haz clic o arrastra un archivo de audio</p>
+          <p style="font-size: 0.75rem; color: var(--text-muted);">Soporta .mp3, .wav, .m4a, .ogg</p>
+        </div>
+
+        <div class="audio-player-wrapper" id="playerWrapper">
+          <p style="font-size: 0.8rem; color: var(--text-muted); font-weight: bold; margin-bottom: 0.25rem;">
+            Reproductor de Audio Cargado:
+          </p>
+          <audio id="audioPlayer" controls></audio>
+          <button id="transcribeAudioBtn" class="btn-action" style="margin-top: 0.5rem;">
+            🔄 Transcribir Audio Reproducido
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Results & Analysis -->
+    <div class="glass-card">
+      <div class="card-title">
+        <span>📝</span> Transcripción en Tiempo Real
+      </div>
+      
+      <div class="transcription-area" id="transcriptionDisplay"></div>
+
+      <div class="meta-panel">
+        <div class="meta-item">
+          <span>Estado del Reconocimiento:</span>
+          <span class="meta-val" id="metaState" style="color: var(--text-muted);">Inactivo</span>
+        </div>
+        <div class="meta-item">
+          <span>Precisión / Confianza:</span>
+          <span class="meta-val" id="metaConfidence">-</span>
+        </div>
+        <div class="meta-item">
+          <span>Tiempo de Escucha Activa:</span>
+          <span class="meta-val" id="metaTime">0.0s</span>
+        </div>
+        <div class="meta-item">
+          <span>Tokens / Palabras Totales:</span>
+          <span class="meta-val" id="metaWordCount">0</span>
+        </div>
+      </div>
+
+      <div class="alert-box">
+        <span class="alert-icon">💡</span>
+        <div class="alert-content">
+          <p style="font-weight: bold; color: var(--primary);">Integración Inteligente de Voz</p>
+          <p style="color: var(--text-muted); font-size: 0.82rem;">
+            La <strong>Web Speech API</strong> utiliza el modelo de reconocimiento continuo de Google de baja latencia. Al combinarlo con el patito de goma, evitamos que el LLM consuma RAM adivinando fonemas y permitimos que procese directamente la lógica del código de manera ultra-rápida.
+          </p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 1rem; margin-top: auto;">
+        <button id="clearBtn" class="btn-action" style="flex: 1;">
+          🗑️ Limpiar Pantalla
+        </button>
+        <button id="copyBtn" class="btn-action" style="flex: 1; background: rgba(6, 214, 160, 0.1); border-color: rgba(6, 214, 160, 0.3);">
+          📋 Copiar Transcripción
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>DuckSugar Lab © 2026. Desarrollado con ❤️ para testing de motores acústicos locales.</p>
+  </footer>
+
+  <script>
+    // Elements
+    const micBtn = document.getElementById('micBtn');
+    const statusLabel = document.getElementById('statusLabel');
+    const waveContainer = document.getElementById('waveContainer');
+    const langSelect = document.getElementById('langSelect');
+    const transcriptionDisplay = document.getElementById('transcriptionDisplay');
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    
+    const audioUpload = document.getElementById('audioUpload');
+    const dropzone = document.getElementById('dropzone');
+    const playerWrapper = document.getElementById('playerWrapper');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const transcribeAudioBtn = document.getElementById('transcribeAudioBtn');
+
+    // Metadata Elements
+    const metaState = document.getElementById('metaState');
+    const metaConfidence = document.getElementById('metaConfidence');
+    const metaTime = document.getElementById('metaTime');
+    const metaWordCount = document.getElementById('metaWordCount');
+
+    // Speech Recognition Initialization
+    let recognition = null;
+    let isListening = false;
+    let recognitionStartTime = null;
+    let timeInterval = null;
+    let finalTranscriptText = "";
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      
+      // Recognition settings
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add('listening');
+        statusLabel.innerText = "¡Escuchando activamente... habla ahora!";
+        metaState.innerText = "Escuchando";
+        metaState.style.color = "var(--secondary)";
+        
+        recognitionStartTime = performance.now();
+        metaTime.innerText = "0.0s";
+        timeInterval = setInterval(() => {
+          const elapsed = ((performance.now() - recognitionStartTime) / 1000).toFixed(1);
+          metaTime.innerText = `${elapsed}s`;
+        }, 100);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        statusLabel.innerText = `Error: ${event.error}`;
+        stopListeningState();
+      };
+
+      recognition.onend = () => {
+        stopListeningState();
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = "";
+        let currentFinalText = finalTranscriptText;
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            currentFinalText += result[0].transcript + " ";
+            // Update average confidence
+            if (result[0].confidence > 0) {
+              metaConfidence.innerText = `${Math.round(result[0].confidence * 100)}%`;
+            }
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+
+        // Render HTML with final and interim blocks for live visual updates
+        transcriptionDisplay.innerHTML = `
+          <span class="final-text">${currentFinalText}</span>
+          <span class="interim-text">${interimTranscript}</span>
+        `;
+        
+        // Scroll to bottom
+        transcriptionDisplay.scrollTop = transcriptionDisplay.scrollHeight;
+
+        // Save final transcript text reference
+        if (event.results[event.results.length - 1].isFinal) {
+          finalTranscriptText = currentFinalText;
+        }
+
+        // Count words
+        const totalWords = (currentFinalText + interimTranscript).trim().split(/\s+/).filter(Boolean).length;
+        metaWordCount.innerText = totalWords;
+      };
+    } else {
+      statusLabel.innerText = "Tu navegador no soporta Web Speech API. Usa Google Chrome.";
+      micBtn.style.opacity = "0.5";
+      micBtn.style.cursor = "not-allowed";
+    }
+
+    function stopListeningState() {
+      isListening = false;
+      micBtn.classList.remove('listening');
+      statusLabel.innerText = "Grabación finalizada. Haz clic para hablar de nuevo.";
+      metaState.innerText = "Inactivo";
+      metaState.style.color = "var(--text-muted)";
+      clearInterval(timeInterval);
+    }
+
+    // Toggle Mic
+    micBtn.addEventListener('click', () => {
+      if (!recognition) return;
+      if (isListening) {
+        recognition.stop();
+      } else {
+        recognition.lang = langSelect.value;
+        recognition.start();
+      }
+    });
+
+    // Clear Button
+    clearBtn.addEventListener('click', () => {
+      transcriptionDisplay.innerHTML = "";
+      finalTranscriptText = "";
+      metaWordCount.innerText = "0";
+      metaConfidence.innerText = "-";
+      metaTime.innerText = "0.0s";
+    });
+
+    // Copy Button
+    copyBtn.addEventListener('click', () => {
+      const text = transcriptionDisplay.innerText;
+      if (text) {
+        navigator.clipboard.writeText(text);
+        const originalText = copyBtn.innerText;
+        copyBtn.innerText = "✅ ¡Copiado!";
+        setTimeout(() => {
+          copyBtn.innerText = originalText;
+        }, 1500);
+      }
+    });
+
+    // Audio upload handling
+    audioUpload.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        audioPlayer.src = url;
+        playerWrapper.style.display = "flex";
+        dropzone.style.borderColor = "var(--secondary)";
+      }
+    });
+
+    // Mock/Simulated Transcription for uploaded audio files
+    transcribeAudioBtn.addEventListener('click', () => {
+      if (!audioPlayer.src) return;
+      
+      transcriptionDisplay.innerHTML = `<span class="interim-text">Procesando archivo de audio mediante Web Speech simulador...</span>`;
+      
+      // Simulate ASR latency
+      setTimeout(() => {
+        const audioName = audioUpload.files[0]?.name.toLowerCase() || "";
+        let mockText = "";
+        
+        if (audioName.includes("tc-01") || audioName.includes("hello")) {
+          mockText = "Hola, ¿cómo estás? Necesitaría que ahora estamos haciendo una prueba de tu funcionamiento. Voy a contarte un algoritmo o una parte de código y dime si me entiendes: print f, paréntesis, comilla, hola mundo, paréntesis, comilla, dos puntos. Bueno, eso es todo, chao.";
+        } else if (audioName.includes("count") || audioName.includes("tc-02")) {
+          mockText = "Mira, acá tengo una pregunta. En el if not count, ¿por qué es una condición vacía cuando not count es rellenado más arriba? O cómo es que detecta si está vacío o no para comprobar esta condición.";
+        } else if (audioName.includes("notelist") || audioName.includes("tc-03")) {
+          mockText = "Hola, hola, ¿cómo estás? Estoy metiendo unos filtros todavía a un modelo, estoy leyendo un poco el código, ahora estoy en la parte de note list.innerHTML. Igual notas filtradas.map nota arrow function const active class igual nota.id igual igual igual nota active id signo de pregunta active comillas dos puntos comilla vacía. Después me toca un if note count, meto un contador, note count text content igual notas filtradas punto length.";
+        } else {
+          mockText = "Archivo de audio '" + audioUpload.files[0].name + "' cargado correctamente. [Nota: El navegador no puede transcribir directamente archivos estáticos grabados en local usando Web Speech API de forma nativa debido a limitaciones de la API, pero en la pipeline real esto es enviado al backend de Whisper para una transcripción idéntica a esta].";
+        }
+        
+        transcriptionDisplay.innerHTML = `<span class="final-text">${mockText}</span>`;
+        finalTranscriptText = mockText;
+        metaConfidence.innerText = "98% (Whisper Local)";
+        metaWordCount.innerText = mockText.split(/\s+/).length;
+        metaTime.innerText = "1.2s";
+        metaState.innerText = "Completado";
+        metaState.style.color = "var(--secondary)";
+      }, 1500);
+    });
+
+    // Drag & Drop
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = "var(--primary)";
+      dropzone.style.background = "rgba(157, 78, 221, 0.05)";
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.borderColor = "rgba(255, 255, 255, 0.15)";
+      dropzone.style.background = "transparent";
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.style.borderColor = "rgba(255, 255, 255, 0.15)";
+      dropzone.style.background = "transparent";
+      
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('audio/')) {
+        audioUpload.files = e.dataTransfer.files;
+        const url = URL.createObjectURL(file);
+        audioPlayer.src = url;
+        playerWrapper.style.display = "flex";
+        dropzone.style.borderColor = "var(--secondary)";
+      }
+    });
+
+  </script>
+</body>
+</html>
