@@ -41,9 +41,20 @@ export class PipelineEngine {
   private log(type: string, data: Record<string, unknown> = {}): void {
     const item: EventLog = { at: new Date().toISOString(), type, data };
     this.store.addEvent(item);
+    if (!this.shouldRefreshLatestReport()) return;
     const report = this.reports.build();
     this.store.update({ latestReport: report });
     this.reports.persistLast(report);
+  }
+
+  private shouldRefreshLatestReport(): boolean {
+    const state = this.store.get();
+    if (!state.isPromptRunning) return true;
+
+    const rawOutput = (state.rawOutputText ?? "").trim();
+    if (!rawOutput || rawOutput === "Esperando respuesta...") return false;
+
+    return true;
   }
 
   private setStatus(text: string, kind = ""): void {
@@ -129,18 +140,13 @@ export class PipelineEngine {
         if (transcriptionRequestId !== this.audioTranscriptionRequestId) return;
         this.log("audio-file-transcribe-error", { name: file.name, message: (error as Error).message });
         
-        if (testCase) {
-          this.store.update({ audioStateText: `Audio listo (usando transcript del dataset)` });
-          this.startTypingAnimation(testCase.expectedTranscript, "Usando transcript del dataset");
-        } else {
-          this.store.update({ 
-            expectedTranscript: "", 
-            manualTranscript: "",
-            isTranscribingAudio: false,
-            audioStateText: `Audio listo (Google ASR no disponible)` 
-          });
-          this.setStatus("Google ASR no disponible (¿Está corriendo el servidor?)", "bad");
-        }
+        this.store.update({
+          expectedTranscript: "",
+          manualTranscript: "",
+          isTranscribingAudio: false,
+          audioStateText: "Audio listo, pero Google ASR fallo"
+        });
+        this.setStatus("Google ASR requerido: inicia con npm run start/dev en este puerto", "bad");
       })
       .finally(() => {
         if (transcriptionRequestId === this.audioTranscriptionRequestId) {
@@ -262,9 +268,6 @@ export class PipelineEngine {
     if (state.manualTranscript && state.manualTranscript.trim().length > 0) {
       transcription = state.manualTranscript.trim();
       transcriptionSource = "google_asr";
-    } else if (state.currentTestCase?.expectedTranscript) {
-      transcription = state.currentTestCase.expectedTranscript;
-      transcriptionSource = "dataset";
     } else if (state.expectedTranscript && state.expectedTranscript.trim().length > 0) {
       transcription = state.expectedTranscript.trim();
       transcriptionSource = "file_asr";
@@ -433,6 +436,9 @@ export class PipelineEngine {
         },
         audioDurationMs: asset.durationMs,
         codeDetected,
+        sourceTranscript: transcription,
+        localCodeSketch: codeSketch.code,
+        localCodeTags: codeSketch.tags,
       });
       this.finishRun(asset, run);
       return true;

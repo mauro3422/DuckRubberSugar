@@ -45,6 +45,9 @@ export class LanguageModelService {
     onChunk: (text: string) => void;
     audioDurationMs?: number | null;
     codeDetected?: boolean;
+    sourceTranscript?: string;
+    localCodeSketch?: string;
+    localCodeTags?: string[];
   }): Promise<{
     firstPass: PromptRun;
     response: string;
@@ -67,7 +70,8 @@ export class LanguageModelService {
       let repairPassMs: number | null = null;
       const repairAttempts: RepairAttempt[] = [];
       let fallbackUsed = false;
-      let parsed = JsonTools.extractResponse(response);
+      let parsed = this.hydrateParsed(JsonTools.extractResponse(response), args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
+      if (parsed) response = JsonTools.serializeToXml(parsed);
       let bestResponse = response;
       let bestParsed = parsed;
 
@@ -84,7 +88,8 @@ export class LanguageModelService {
             args.codeDetected
           );
           response = result.response;
-          parsed = result.parsed;
+          parsed = this.hydrateParsed(result.parsed, args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
+          response = parsed ? JsonTools.serializeToXml(parsed) : result.response;
           bestResponse = response;
           bestParsed = parsed;
           repairAttempts.push(result.attempt);
@@ -114,7 +119,8 @@ export class LanguageModelService {
             bestParsed
           );
           response = result.response;
-          parsed = result.parsed;
+          parsed = this.hydrateParsed(result.parsed, args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
+          response = parsed ? JsonTools.serializeToXml(parsed) : result.response;
           bestResponse = response;
           bestParsed = parsed;
           repairAttempts.push(result.attempt);
@@ -145,7 +151,8 @@ export class LanguageModelService {
             args.onChunk
           );
           response = result.response;
-          parsed = result.parsed;
+          parsed = this.hydrateParsed(result.parsed, args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
+          response = parsed ? JsonTools.serializeToXml(parsed) : result.response;
           bestResponse = response;
           bestParsed = parsed;
           repairAttempts.push(result.attempt);
@@ -197,5 +204,28 @@ export class LanguageModelService {
         runSession.destroy();
       }
     }
+  }
+
+  private hydrateParsed<T extends ReturnType<typeof JsonTools.extractResponse>>(
+    parsed: T,
+    sourceTranscript?: string,
+    localCodeSketch?: string,
+    localCodeTags?: string[],
+  ): T {
+    if (!parsed) return parsed;
+    const patch: Record<string, unknown> = {};
+
+    if (sourceTranscript?.trim() && !(parsed.transcript ?? "").trim()) {
+      patch.transcript = sourceTranscript.trim();
+    }
+
+    if (localCodeSketch?.trim() && !(parsed.code ?? "").trim()) {
+      patch.code = localCodeSketch.trim();
+      patch.code_origin = "speech_normalizer";
+      patch.code_tags = localCodeTags ?? [];
+      patch.code_notes = "Codigo probable reconstruido localmente desde ASR y contexto disponible.";
+    }
+
+    return Object.keys(patch).length ? { ...parsed, ...patch } as T : parsed;
   }
 }

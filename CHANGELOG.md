@@ -12,6 +12,10 @@
 
 ### Changed
 
+- Removed dataset transcript fallback; every audio run now requires Google ASR output.
+- Reports no longer refresh from the in-progress placeholder output while a prompt is running.
+- Model results are locally hydrated with the ASR transcript when the XML omits `<transcript>`.
+- Empty model `<code>` can be hydrated from the trusted local code sketch before triggering repair.
 - `SpeechNormalizer.hasCodePatterns` now uses normalized identifiers and optional IDE context.
 - `SpeechNormalizer.inferCodeFromSpeech` now accepts optional IDE/RAG context.
 - `tc-01` style `printf` dictation is recovered before universal TypeScript token fallback.
@@ -20,6 +24,8 @@
 
 ### Fixed
 
+- Prevented mixed `latestReport` states such as previous metrics plus `rawOutput: "Esperando respuesta..."`.
+- Avoided self-refinement for trusted deterministic local sketches.
 - Removed debug logging from `SpeechNormalizer`.
 - Prevented malformed symbol-only snippets from contaminating benchmark runs.
 - Improved preanalysis stability for the current benchmark set.

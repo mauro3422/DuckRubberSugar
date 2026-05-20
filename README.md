@@ -106,6 +106,7 @@ Check:
 ## Benchmarks
 
 The local dataset lives in `src/data/default-dataset.ts` and audio samples live in `pruebas/`.
+Dataset entries do not provide transcript fallbacks. Audio runs must go through Google ASR; if `/transcribe` fails, the run is blocked instead of using a stored transcript.
 
 Current benchmark cases:
 

@@ -254,6 +254,14 @@ export class LanguageModelGuard {
     const code = (parsed.code ?? "").trim();
     const transcript = (parsed.transcript ?? "").trim();
     const tags = (parsed.thought_tags ?? "").toLowerCase();
+    const codeTags = parsed.code_tags ?? [];
+
+    if (
+      parsed.code_origin === "speech_normalizer" &&
+      codeTags.some((tag) => ["spoken_print_call", "spoken_not_condition", "context_lexicon_reconstruction"].includes(tag))
+    ) {
+      return false;
+    }
 
     // Check 1: Unbalanced brackets/braces/parentheses using CodeAnalysis
     if (CodeAnalysis.hasUnbalancedDelimiters(code)) return true;

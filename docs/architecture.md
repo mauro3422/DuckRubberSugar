@@ -33,7 +33,7 @@ Audio input
 - `src/utils/wav-encoder.ts`: browser-side WAV conversion.
 - `transcribe_server.py`: static server plus Google ASR endpoint.
 
-The app intentionally blocks new file runs when no ASR transcript is available. Chrome Nano is not used as a raw audio transcriber in the current flow.
+The app intentionally blocks new file runs when no ASR transcript is available. Dataset transcripts are not used as fallbacks. Chrome Nano is not used as a raw audio transcriber in the current flow.
 
 ### Local Preanalysis
 
