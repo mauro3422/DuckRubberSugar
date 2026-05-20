@@ -8,7 +8,8 @@
     "start": "python transcribe_server.py",
     "asr": "python transcribe_server.py",
     "asr:5501": "set DUCKSUGAR_PORT=5501&& python transcribe_server.py",
-    "dev": "tsc && python transcribe_server.py"
+    "dev": "node scripts/dev.mjs",
+    "dev:once": "tsc && python transcribe_server.py"
   },
   "devDependencies": {
     "typescript": "^5.4.5"

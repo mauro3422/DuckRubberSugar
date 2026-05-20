@@ -11,6 +11,7 @@
 - Added `[CODE NOTES]` prompt injection from local preanalysis.
 - Added ASR bridge discovery so the app can run from Live Server while Google ASR runs on a separate local port.
 - Added `npm run asr:5501` for the common case where VS Code Live Server owns port `5500`.
+- Added a single-command `npm run dev` runner that starts TypeScript watch and the DuckSugar ASR/static server together.
 
 ### Changed
 
@@ -25,6 +26,7 @@
 - `tc-02` style `if not count` is recovered as `if (!count)`.
 - `tc-03` style note-list reconstruction now comes from IDE context identifiers rather than a global dictionary.
 - `transcribe_server.py` now auto-tries configured local ASR ports when the preferred port is unavailable.
+- `npm run dev` now keeps TypeScript compilation active instead of compiling once before starting Python.
 
 ### Fixed
 

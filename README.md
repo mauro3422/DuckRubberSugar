@@ -73,13 +73,15 @@ Run the local server:
 npm run start
 ```
 
-Or compile and run in one command:
+For day-to-day development, run one command:
 
 ```bash
 npm run dev
 ```
 
-For active development, use two terminals:
+This starts TypeScript watch plus the DuckSugar static/ASR server. Use the URL printed by the server. If `5500` is occupied, the server auto-tries `5501` and `5510`.
+
+If you want separate terminals:
 
 ```bash
 npm run watch
@@ -100,9 +102,11 @@ Preferred mode is same-origin:
 npm run dev
 ```
 
-Then open `http://127.0.0.1:5500/index.html`.
+Then open the URL printed by the server, usually `http://127.0.0.1:5500/index.html`.
 
-If VS Code Live Server already owns `5500`, keep the page there and run the ASR bridge on another port:
+If VS Code Live Server already owns `5500`, `npm run dev` will keep running and the Python server will fall forward to `5501` or `5510`. Open the printed DuckSugar URL instead of Go Live for the cleanest benchmark path.
+
+If you intentionally keep the page on Go Live, still run the ASR bridge once:
 
 ```bash
 npm run asr:5501
@@ -117,7 +121,7 @@ The browser probes these ASR bridge origins:
 - optional `?asr=http://127.0.0.1:PORT`;
 - optional `localStorage.ducksugarAsrBridgeUrl`.
 
-The Python server also auto-tries `5500`, `5501`, and `5510` when its preferred port is busy. A valid run requires `/health` to return `{"service":"ducksugar","asr":"google"}`. Otherwise the audio run is blocked and the benchmark is invalid.
+The Python server auto-tries `5500`, `5501`, and `5510` when its preferred port is busy. A valid run requires `/health` to return `{"service":"ducksugar","asr":"google"}`. Otherwise the audio run is blocked and the benchmark is invalid.
 
 ## Chrome Requirements
 
@@ -134,6 +138,8 @@ Check:
 
 The local dataset lives in `src/data/default-dataset.ts` and audio samples live in `pruebas/`.
 Dataset entries do not provide transcript fallbacks. Audio runs must go through Google ASR; if `/transcribe` fails, the run is blocked instead of using a stored transcript.
+
+Benchmarks load files from `pruebas/`; you do not need to record each sample manually. The browser fetches each audio file, converts it to WAV, sends it through the local Google ASR bridge, and only then prompts the model.
 
 Before benchmarking, confirm the event log contains `asr-bridge-selected`, `audio-file-transcribed`, and `transcriptionSource: "google_asr"`. Runs with `audio-file-transcribe-error`, `missing-google-asr-transcription`, or any dataset/file transcript source should be discarded.
 
