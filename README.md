@@ -92,6 +92,8 @@ Open:
 http://127.0.0.1:5500/index.html
 ```
 
+Do not open the app with VS Code Live Server on port `5500`. DuckSugar needs its Python server on that origin because the browser posts audio to `POST /transcribe`. If `/health` is missing or does not return `{"service":"ducksugar"}`, the app will block ASR and the benchmark run is invalid.
+
 ## Chrome Requirements
 
 DuckSugar depends on Chrome's experimental local `LanguageModel` API. The exact flags can change across Chrome versions, but this project expects the on-device Gemini Nano model and Prompt API to be available in the browser.

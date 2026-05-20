@@ -24,6 +24,7 @@
 
 ### Fixed
 
+- Added an ASR bridge `/health` preflight before `POST /transcribe`, so Live Server/incorrect-origin runs fail loudly instead of corrupting benchmarks.
 - Prevented mixed `latestReport` states such as previous metrics plus `rawOutput: "Esperando respuesta..."`.
 - Avoided self-refinement for trusted deterministic local sketches.
 - Removed debug logging from `SpeechNormalizer`.

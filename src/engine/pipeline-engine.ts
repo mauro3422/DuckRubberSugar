@@ -201,6 +201,8 @@ export class PipelineEngine {
   }
 
   async transcribeAudioFile(file: File): Promise<string> {
+    await this.assertDuckSugarAsrBridge();
+
     const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextCtor) throw new Error("AudioContext no soportado");
     
@@ -230,6 +232,31 @@ export class PipelineEngine {
       return data.transcript;
     } finally {
       await context.close().catch(() => undefined);
+    }
+  }
+
+  private async assertDuckSugarAsrBridge(): Promise<void> {
+    let response: Response;
+    try {
+      response = await fetch("/health", { method: "GET", cache: "no-store" });
+    } catch (error) {
+      throw new Error(`No se pudo conectar al puente ASR local: ${(error as Error).message}`);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Servidor incorrecto en ${window.location.origin}: /health devolvio HTTP ${response.status}. Abre la app con npm run start/dev, no con Live Server.`);
+    }
+
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error(`Servidor incorrecto en ${window.location.origin}: /health no devolvio JSON de DuckSugar.`);
+    }
+
+    const health = data as { success?: unknown; service?: unknown; asr?: unknown };
+    if (health.success !== true || health.service !== "ducksugar" || health.asr !== "google") {
+      throw new Error(`Servidor incorrecto en ${window.location.origin}: no es el puente ASR de DuckSugar. Deten Live Server y ejecuta npm run start/dev.`);
     }
   }
 
