@@ -92,7 +92,32 @@ Open:
 http://127.0.0.1:5500/index.html
 ```
 
-Do not open the app with VS Code Live Server on port `5500`. DuckSugar needs its Python server on that origin because the browser posts audio to `POST /transcribe`. If `/health` is missing or does not return `{"service":"ducksugar"}`, the app will block ASR and the benchmark run is invalid.
+### Port Modes
+
+Preferred mode is same-origin:
+
+```bash
+npm run dev
+```
+
+Then open `http://127.0.0.1:5500/index.html`.
+
+If VS Code Live Server already owns `5500`, keep the page there and run the ASR bridge on another port:
+
+```bash
+npm run asr:5501
+```
+
+The browser probes these ASR bridge origins:
+
+- current page origin;
+- `http://127.0.0.1:5500`;
+- `http://127.0.0.1:5501`;
+- `http://127.0.0.1:5510`;
+- optional `?asr=http://127.0.0.1:PORT`;
+- optional `localStorage.ducksugarAsrBridgeUrl`.
+
+The Python server also auto-tries `5500`, `5501`, and `5510` when its preferred port is busy. A valid run requires `/health` to return `{"service":"ducksugar","asr":"google"}`. Otherwise the audio run is blocked and the benchmark is invalid.
 
 ## Chrome Requirements
 
@@ -109,6 +134,8 @@ Check:
 
 The local dataset lives in `src/data/default-dataset.ts` and audio samples live in `pruebas/`.
 Dataset entries do not provide transcript fallbacks. Audio runs must go through Google ASR; if `/transcribe` fails, the run is blocked instead of using a stored transcript.
+
+Before benchmarking, confirm the event log contains `asr-bridge-selected`, `audio-file-transcribed`, and `transcriptionSource: "google_asr"`. Runs with `audio-file-transcribe-error`, `missing-google-asr-transcription`, or any dataset/file transcript source should be discarded.
 
 Current benchmark cases:
 

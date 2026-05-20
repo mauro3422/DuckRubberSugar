@@ -5,6 +5,7 @@ import socketserver
 import subprocess
 import sys
 import tempfile
+from typing import Iterable
 from urllib.parse import urlparse
 
 try:
@@ -15,7 +16,9 @@ except ImportError:
     import speech_recognition as sr
 
 
-PORT = int(os.environ.get("DUCKSUGAR_PORT", "5500"))
+DEFAULT_PORT = 5500
+PORT = int(os.environ.get("DUCKSUGAR_PORT", str(DEFAULT_PORT)))
+AUTO_PORTS = os.environ.get("DUCKSUGAR_AUTO_PORTS", "5500,5501,5510")
 LANGUAGE = os.environ.get("DUCKSUGAR_ASR_LANG", "es-AR")
 
 
@@ -38,6 +41,7 @@ class DuckSugarHandler(http.server.SimpleHTTPRequestHandler):
                 "service": "ducksugar",
                 "asr": "google",
                 "language": LANGUAGE,
+                "port": self.server.server_address[1],
             })
             return
         super().do_GET()
@@ -86,15 +90,37 @@ class DuckSugarHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(response, ensure_ascii=False).encode("utf-8"))
 
 
+def candidate_ports() -> Iterable[int]:
+    seen = set()
+    for raw_port in [str(PORT), *AUTO_PORTS.split(",")]:
+        try:
+            port = int(raw_port.strip())
+        except ValueError:
+            continue
+        if port in seen:
+            continue
+        seen.add(port)
+        yield port
+
+
 def run():
     socketserver.ThreadingTCPServer.allow_reuse_address = True
-    with socketserver.ThreadingTCPServer(("127.0.0.1", PORT), DuckSugarHandler) as server:
-        print(f"DuckSugar server: http://127.0.0.1:{PORT}/")
-        print(f"Google ASR endpoint: http://127.0.0.1:{PORT}/transcribe")
+    last_error = None
+    for port in candidate_ports():
         try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            pass
+            with socketserver.ThreadingTCPServer(("127.0.0.1", port), DuckSugarHandler) as server:
+                print(f"DuckSugar server: http://127.0.0.1:{port}/")
+                print(f"Google ASR endpoint: http://127.0.0.1:{port}/transcribe")
+                try:
+                    server.serve_forever()
+                except KeyboardInterrupt:
+                    pass
+                return
+        except OSError as error:
+            last_error = error
+            print(f"Port {port} unavailable for DuckSugar ASR bridge: {error}")
+
+    raise RuntimeError(f"No available DuckSugar ASR bridge port. Last error: {last_error}")
 
 
 if __name__ == "__main__":

@@ -35,6 +35,7 @@ export class PipelineEngine {
   private typingIntervalId: number | null = null;
   private audioTranscriptionPromise: Promise<void> | null = null;
   private audioTranscriptionRequestId = 0;
+  private asrBridgeUrl: string | null = null;
 
   constructor(private readonly store: AppStore) {}
 
@@ -146,7 +147,7 @@ export class PipelineEngine {
           isTranscribingAudio: false,
           audioStateText: "Audio listo, pero Google ASR fallo"
         });
-        this.setStatus("Google ASR requerido: inicia con npm run start/dev en este puerto", "bad");
+        this.setStatus("Google ASR requerido: inicia npm run asr o asr:5501", "bad");
       })
       .finally(() => {
         if (transcriptionRequestId === this.audioTranscriptionRequestId) {
@@ -201,7 +202,7 @@ export class PipelineEngine {
   }
 
   async transcribeAudioFile(file: File): Promise<string> {
-    await this.assertDuckSugarAsrBridge();
+    const asrBridgeUrl = await this.resolveDuckSugarAsrBridge();
 
     const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextCtor) throw new Error("AudioContext no soportado");
@@ -212,7 +213,7 @@ export class PipelineEngine {
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
       const wavBlob = audioBufferToWav(audioBuffer);
       
-      const response = await fetch("/transcribe", {
+      const response = await fetch(`${asrBridgeUrl}/transcribe`, {
         method: "POST",
         body: wavBlob,
         headers: {
@@ -235,28 +236,104 @@ export class PipelineEngine {
     }
   }
 
-  private async assertDuckSugarAsrBridge(): Promise<void> {
-    let response: Response;
-    try {
-      response = await fetch("/health", { method: "GET", cache: "no-store" });
-    } catch (error) {
-      throw new Error(`No se pudo conectar al puente ASR local: ${(error as Error).message}`);
+  private async resolveDuckSugarAsrBridge(): Promise<string> {
+    const candidates = this.asrBridgeCandidates();
+    const failures: string[] = [];
+
+    for (const candidate of candidates) {
+      const bridgeUrl = this.normalizeBridgeUrl(candidate);
+      if (!bridgeUrl) continue;
+
+      try {
+        const response = await this.fetchWithTimeout(`${bridgeUrl}/health`, { method: "GET", cache: "no-store" }, 2500);
+        if (!response.ok) {
+          failures.push(`${bridgeUrl}: HTTP ${response.status}`);
+          continue;
+        }
+
+        let data: unknown;
+        try {
+          data = await response.json();
+        } catch {
+          failures.push(`${bridgeUrl}: /health no devolvio JSON`);
+          continue;
+        }
+
+        const health = data as { success?: unknown; service?: unknown; asr?: unknown; port?: unknown };
+        if (health.success === true && health.service === "ducksugar" && health.asr === "google") {
+          if (this.asrBridgeUrl !== bridgeUrl) {
+            this.log("asr-bridge-selected", {
+              url: bridgeUrl,
+              appOrigin: window.location.origin,
+              sameOrigin: bridgeUrl === window.location.origin,
+              port: health.port ?? null,
+            });
+          }
+          this.asrBridgeUrl = bridgeUrl;
+          return bridgeUrl;
+        }
+
+        failures.push(`${bridgeUrl}: no es DuckSugar ASR`);
+      } catch (error) {
+        failures.push(`${bridgeUrl}: ${(error as Error).message}`);
+      }
     }
 
-    if (!response.ok) {
-      throw new Error(`Servidor incorrecto en ${window.location.origin}: /health devolvio HTTP ${response.status}. Abre la app con npm run start/dev, no con Live Server.`);
-    }
+    this.asrBridgeUrl = null;
+    throw new Error([
+      "No se encontro el puente ASR local de DuckSugar.",
+      `App actual: ${window.location.origin}.`,
+      `Puertos probados: ${candidates.join(", ")}.`,
+      failures.length ? `Detalles: ${failures.join(" | ")}.` : "",
+      "Inicia el puente con `npm run asr` o `npm run asr:5501` y vuelve a cargar el audio.",
+    ].filter(Boolean).join(" "));
+  }
 
-    let data: unknown;
+  private asrBridgeCandidates(): string[] {
+    const candidates: string[] = [];
+    const add = (value: unknown) => {
+      if (typeof value !== "string" || !value.trim()) return;
+      if (!candidates.includes(value.trim())) candidates.push(value.trim());
+    };
+
+    add(this.asrBridgeUrl);
+
     try {
-      data = await response.json();
+      add(new URLSearchParams(window.location.search).get("asr"));
     } catch {
-      throw new Error(`Servidor incorrecto en ${window.location.origin}: /health no devolvio JSON de DuckSugar.`);
+      // Ignore invalid location/search access in unusual browser contexts.
     }
 
-    const health = data as { success?: unknown; service?: unknown; asr?: unknown };
-    if (health.success !== true || health.service !== "ducksugar" || health.asr !== "google") {
-      throw new Error(`Servidor incorrecto en ${window.location.origin}: no es el puente ASR de DuckSugar. Deten Live Server y ejecuta npm run start/dev.`);
+    try {
+      add(window.localStorage.getItem("ducksugarAsrBridgeUrl"));
+    } catch {
+      // localStorage can be disabled; probing defaults is enough.
+    }
+
+    add((window as any).DUCKSUGAR_ASR_BRIDGE_URL);
+    add(window.location.origin);
+    add("http://127.0.0.1:5500");
+    add("http://127.0.0.1:5501");
+    add("http://127.0.0.1:5510");
+    return candidates;
+  }
+
+  private normalizeBridgeUrl(value: string): string | null {
+    try {
+      const url = new URL(value);
+      return url.origin;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   }
 
@@ -295,9 +372,6 @@ export class PipelineEngine {
     if (state.manualTranscript && state.manualTranscript.trim().length > 0) {
       transcription = state.manualTranscript.trim();
       transcriptionSource = "google_asr";
-    } else if (state.expectedTranscript && state.expectedTranscript.trim().length > 0) {
-      transcription = state.expectedTranscript.trim();
-      transcriptionSource = "file_asr";
     } else if (this.audio.micTranscription && this.audio.micTranscription.trim().length > 0) {
       transcription = this.audio.micTranscription.trim();
       transcriptionSource = "mic";
@@ -310,7 +384,7 @@ export class PipelineEngine {
           "No hay transcripcion ASR disponible.",
           "",
           "DuckSugar no va a usar Chrome Nano como transcriptor para archivos nuevos.",
-          "Inicia DuckSugar con `npm run start` y vuelve a cargar el audio."
+          "Inicia el puente ASR con `npm run asr` o `npm run asr:5501` y vuelve a cargar el audio."
         ].join("\n"),
         parsedResponse: null
       });

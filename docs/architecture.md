@@ -7,6 +7,7 @@ DuckSugar is a browser-first local voice assistant for developer workflows. It i
 ```text
 Audio input
   -> AudioService
+  -> ASR bridge discovery via /health
   -> transcribe_server.py /transcribe
   -> Google ASR transcript
   -> SpeechNormalizer preanalysis
@@ -34,6 +35,15 @@ Audio input
 - `transcribe_server.py`: static server plus Google ASR endpoint.
 
 The app intentionally blocks new file runs when no ASR transcript is available. Dataset transcripts are not used as fallbacks. Chrome Nano is not used as a raw audio transcriber in the current flow.
+
+The ASR bridge can run same-origin with the app or on a separate local port. `PipelineEngine` probes `/health` on the current origin and known local bridge ports before sending audio to `/transcribe`. This avoids the corrupted benchmark case where VS Code Live Server owns `5500` and returns `405 Method Not Allowed` for `POST /transcribe`.
+
+Valid benchmark preconditions:
+
+- `/health` identifies `service: "ducksugar"` and `asr: "google"`;
+- the event log includes `asr-bridge-selected`;
+- the file load emits `audio-file-transcribed`;
+- no dataset transcript fallback is present.
 
 ### Local Preanalysis
 
