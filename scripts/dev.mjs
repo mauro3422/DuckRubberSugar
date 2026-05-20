@@ -6,7 +6,7 @@ const children = [];
 function run(name, command, args) {
   const child = spawn(command, args, {
     cwd: process.cwd(),
-    env: process.env,
+    env: { ...process.env, PYTHONUNBUFFERED: "1" },
     shell: isWindows,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -53,4 +53,4 @@ console.log("[dev] Starting TypeScript watch and DuckSugar ASR/static server.");
 console.log("[dev] Open the DuckSugar URL printed by the server. If 5500 is busy, it will try 5501/5510.");
 
 run("tsc", "npx", ["tsc", "--watch", "--preserveWatchOutput"]);
-run("asr", "python", ["transcribe_server.py"]);
+run("asr", "python", ["-u", "transcribe_server.py"]);

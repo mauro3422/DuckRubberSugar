@@ -24,7 +24,7 @@ LANGUAGE = os.environ.get("DUCKSUGAR_ASR_LANG", "es-AR")
 
 class DuckSugarHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
-        print(f"[DuckSugar] {self.address_string()} - {format % args}")
+        print(f"[DuckSugar] {self.address_string()} - {format % args}", flush=True)
 
     def do_OPTIONS(self):
         self.send_response(200, "OK")
@@ -109,8 +109,8 @@ def run():
     for port in candidate_ports():
         try:
             with socketserver.ThreadingTCPServer(("127.0.0.1", port), DuckSugarHandler) as server:
-                print(f"DuckSugar server: http://127.0.0.1:{port}/")
-                print(f"Google ASR endpoint: http://127.0.0.1:{port}/transcribe")
+                print(f"DuckSugar server: http://127.0.0.1:{port}/", flush=True)
+                print(f"Google ASR endpoint: http://127.0.0.1:{port}/transcribe", flush=True)
                 try:
                     server.serve_forever()
                 except KeyboardInterrupt:
@@ -118,7 +118,7 @@ def run():
                 return
         except OSError as error:
             last_error = error
-            print(f"Port {port} unavailable for DuckSugar ASR bridge: {error}")
+            print(f"Port {port} unavailable for DuckSugar ASR bridge: {error}", flush=True)
 
     raise RuntimeError(f"No available DuckSugar ASR bridge port. Last error: {last_error}")
 
