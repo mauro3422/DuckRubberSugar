@@ -11,21 +11,35 @@ import { TokenEstimator } from "../utils/token-estimator.js";
 import { DefaultDataset } from "../data/default-dataset.js";
 import { audioBufferToWav } from "../utils/wav-encoder.js";
 import { TranscriptMerger } from "../utils/transcript-merger.js";
+import { BootstrapMerger } from "../services/bootstrap-merger.js";
 
 export class PipelineEngine {
   readonly storage = new StorageService();
   readonly benchmark = new BenchmarkService(this.storage);
   readonly model = new LanguageModelService();
   readonly audio = new AudioService();
+  readonly bootstrap = new BootstrapMerger();
   readonly reports = new ReportService(this.storage, () => {
     const state = this.store.get();
+    const caseId = state.currentTestCase?.id;
+    let expectedTranscript = state.expectedTranscript || "";
+    let expectedCode = state.currentTestCase?.expectedCode ?? "";
+
+    if (caseId) {
+      const merged = this.bootstrap.getMerged(caseId);
+      if (merged) {
+        if (!expectedTranscript) expectedTranscript = merged.transcript;
+        if (!expectedCode) expectedCode = merged.code;
+      }
+    }
+
     return {
       sessionMode: state.sessionMode,
       promptVersion: state.dynamicPromptVersion || AppConfig.promptVersion,
       metrics: state.latestMetrics,
       rawOutput: state.rawOutputText || "",
-      expectedTranscript: state.expectedTranscript || "",
-      expectedCode: state.currentTestCase?.expectedCode ?? "",
+      expectedTranscript,
+      expectedCode,
       testCase: state.currentTestCase
         ? { id: state.currentTestCase.id, fileName: state.currentTestCase.fileName }
         : null,
@@ -939,6 +953,11 @@ export class PipelineEngine {
     this.reports.persistLast(report);
     this.reports.saveHistory(report);
     this.benchmark.add(report);
+
+    const testCase = this.store.get().currentTestCase;
+    if (testCase && parsed && (!testCase.expectedTranscript || !testCase.expectedCode)) {
+      this.bootstrap.addRun(testCase.id, parsed.transcript ?? "", parsed.code ?? "");
+    }
     
     // update benchmark entries in store to re-render
     this.store.update({ benchmarkEntries: this.benchmark.read() });

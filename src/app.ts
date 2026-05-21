@@ -286,7 +286,10 @@ export class DuckSugarApp {
         for (let index = 1; index <= count; index += 1) {
           globalIndex += 1;
           this.view.showProgress(globalIndex, totalRuns, `[${testCase.id}] ${index}/${count}`);
-          this.store.update({ statusText: `[${testCase.id}] Benchmark ${index}/${count}`, statusKind: "" });
+          const bootInfo = !testCase.expectedTranscript || !testCase.expectedCode
+            ? ` bootstrap:${this.engine.bootstrap.getRunCount(testCase.id)}/10`
+            : "";
+          this.store.update({ statusText: `[${testCase.id}] Benchmark ${index}/${count}${bootInfo}`, statusKind: "" });
           await this.engine.sendAudio(this.view.input.instruction.value, this.view.toolbar.streamingToggle.checked, () => {}, this.view.toolbar.langSelect.value);
           if (globalIndex % 15 === 0) await this.engine.resetModelSession();
           await new Promise((resolve) => setTimeout(resolve, 250));

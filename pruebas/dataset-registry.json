@@ -17,5 +17,11 @@
     "expectedTranscript": "Hola, hola, como estas? Estoy haciendo aca metiendo unos filtros todavia a un modelo, estoy leyendo un poco el codigo, ahora estoy en la parte donde estoy en note list.innerhtml. Igual notas filtradas.map, nota arrow function const active class, nota id igual igual igual, nota active id, active, bueno, okay. Despues de eso me toca un if note count que estoy metiendo un contador si no me equivoco, eh, note.count.text content eh, content igual, eh, comilla, notas, eh, notas filtradas, eh, con la escritura correcta claramente, length de notas.",
     "expectedCode": "noteList.innerHTML = notasFiltradas.map(nota => { const activeClass = nota.id === noteActiveId ? 'active' : ''; });\nif (noteCount) {\n  noteCount.textContent = notasFiltradas.length + ' notas';\n}",
     "contextHint": "<ide_context>\ntipo: contexto_visible_de_ide\nlenguaje_probable: JavaScript\ntema: lista de notas filtradas\nidentificadores_visibles: noteList, notasFiltradas, nota, noteActiveId, activeClass, noteCount\ntokens_visibles: innerHTML, map, const, id, active, if, textContent, length, notas\ninstruccion: usar solo para elegir identificadores cuando el audio sea ambiguo; no completar lineas que el audio no mencione.\n</ide_context>"
+  },
+  {
+    "id": "tc-04-printf",
+    "fileName": "prueba4.ogg",
+    "expectedTranscript": "",
+    "expectedCode": ""
   }
 ]
