@@ -80,6 +80,19 @@ export class DuckSugarApp {
       });
       this.view.showToast("🗑 Benchmark limpiado");
     });
+
+    this.view.toolbar.liveChatButton.addEventListener("click", () => {
+      const isLiveChat = this.store.get().isLiveChat;
+      if (isLiveChat) {
+        this.engine.stopLiveChat((type, data) => this.store.addEvent({ at: new Date().toISOString(), type, data: data || {} }));
+        this.store.update({ isLiveChat: false });
+        this.view.showToast("💬 Live chat detenido");
+      } else {
+        this.store.update({ isLiveChat: true });
+        void this.engine.startLiveChat(this.audioDelegate, (type, data) => this.store.addEvent({ at: new Date().toISOString(), type, data: data || {} }), this.view.toolbar.langSelect.value);
+        this.view.showToast("💬 Live chat iniciado - hablá ahora");
+      }
+    });
     this.view.input.audioFile.addEventListener("change", () => {
       const file = this.view.input.audioFile.files?.[0];
       if (file) this.engine.loadAudioFile(file, this.audioDelegate);
@@ -158,7 +171,8 @@ export class DuckSugarApp {
         isRecording,
         isInitializing: state.isInitializing,
         isPromptRunning: state.isPromptRunning,
-        isBenchmarkRunning: state.isBenchmarkRunning
+        isBenchmarkRunning: state.isBenchmarkRunning,
+        isLiveChat: state.isLiveChat
       });
 
       // Update recording visual based on actual state

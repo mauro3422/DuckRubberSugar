@@ -4,7 +4,7 @@ import { BenchmarkService } from "../services/benchmark-service.js";
 import { StorageService } from "../services/storage-service.js";
 import { ReportService } from "../services/report-service.js";
 import { LanguageModelService } from "../services/language-model-service.js";
-import { AudioService } from "../services/audio-service.js";
+import { AudioService, type AudioViewDelegate } from "../services/audio-service.js";
 import { AppStore } from "../store/app-store.js";
 import { JsonTools } from "../utils/json-tools.js";
 import { TokenEstimator } from "../utils/token-estimator.js";
@@ -51,6 +51,13 @@ export class PipelineEngine {
   private audioTranscriptionPromise: Promise<void> | null = null;
   private audioTranscriptionRequestId = 0;
   private asrBridgeUrl: string | null = null;
+
+  // Chunked live chat state
+  private chunkedAccumulatedBlobs: Blob[] = [];
+  private chunkedAccumulatedTranscript = "";
+  private chunkedLastTranscript = "";
+  private chunkedProcessing = false;
+  private chunkedChunkIndex = 0;
 
   private pipelineTrace: {
     originalAsr: string;
@@ -976,5 +983,113 @@ export class PipelineEngine {
 
   private tail(text: string, maxChars: number): string {
     return text.length <= maxChars ? text : text.slice(-maxChars);
+  }
+
+  // Chunked live chat processing
+  async startLiveChat(delegate: AudioViewDelegate, onLog: (type: string, data?: Record<string, unknown>) => void, lang = "es-AR"): Promise<void> {
+    this.chunkedAccumulatedBlobs = [];
+    this.chunkedAccumulatedTranscript = "";
+    this.chunkedLastTranscript = "";
+    this.chunkedProcessing = true;
+    this.chunkedChunkIndex = 0;
+
+    this.store.update({ statusText: "Modo live chat activo - hablando...", statusKind: "" });
+    onLog("live-chat-started", { lang });
+
+    await this.audio.startChunked(
+      {
+        ...delegate,
+        onAudioChunk: (chunkBlob, elapsedMs, chunkIndex) => {
+          this.handleAudioChunk(chunkBlob, elapsedMs, chunkIndex, onLog);
+        },
+      },
+      onLog,
+      lang,
+      3000
+    );
+  }
+
+  stopLiveChat(onLog: (type: string, data?: Record<string, unknown>) => void): void {
+    this.chunkedProcessing = false;
+    this.audio.stopChunked(onLog);
+    this.store.update({ statusText: "Live chat detenido", statusKind: "ready" });
+    onLog("live-chat-stopped");
+  }
+
+  private async handleAudioChunk(chunkBlob: Blob, elapsedMs: number, chunkIndex: number, onLog: (type: string, data?: Record<string, unknown>) => void): Promise<void> {
+    if (!this.chunkedProcessing) return;
+
+    this.chunkedAccumulatedBlobs.push(chunkBlob);
+    this.chunkedChunkIndex = chunkIndex;
+
+    onLog("audio-chunk-received", { chunkIndex, size: chunkBlob.size, elapsedMs });
+
+    // Transcribe accumulated audio
+    try {
+      const accumulatedBlob = new Blob(this.chunkedAccumulatedBlobs, { type: chunkBlob.type });
+      const file = new File([accumulatedBlob], `chunk-${chunkIndex}.webm`, { type: chunkBlob.type });
+      const result = await this.transcribeAudioFile(file);
+      const newTranscript = result.transcript || "";
+
+      if (newTranscript !== this.chunkedLastTranscript && newTranscript.length > 0) {
+        this.chunkedLastTranscript = newTranscript;
+        this.chunkedAccumulatedTranscript = newTranscript;
+
+        onLog("live-chat-transcript-updated", { transcript: newTranscript, chunkIndex });
+        this.store.update({ expectedTranscript: newTranscript });
+
+        // Feed to model
+        await this.processLiveChatTranscript(newTranscript, onLog);
+      }
+    } catch (err) {
+      onLog("live-chat-transcription-error", { message: (err as Error).message });
+    }
+  }
+
+  private async processLiveChatTranscript(transcript: string, onLog: (type: string, data?: Record<string, unknown>) => void): Promise<void> {
+    if (!this.chunkedProcessing || !transcript) return;
+
+    try {
+      const runSession = await this.model.getSessionManager().cloneSession();
+      if (!runSession) {
+        onLog("live-chat-clone-failed");
+        return;
+      }
+
+      const promptText = `Audio transcrito: "${transcript}"\n\nAyudame a revisar lo que digo. Si dicto codigo, reconstruye el codigo probable. Responde en formato JSON con campos: transcript, code, answer.`;
+
+      const startTime = performance.now();
+      let responseText = "";
+
+      this.store.update({ isPromptRunning: true, statusText: "Procesando...", statusKind: "" });
+
+      const promptStreaming = runSession.promptStreaming;
+      if (typeof promptStreaming !== "function") {
+        onLog("live-chat-no-streaming");
+        return;
+      }
+
+      const stream = promptStreaming.call(runSession, promptText);
+      for await (const chunk of stream) {
+        if (!this.chunkedProcessing) break;
+        const chunkStr = String(chunk);
+        responseText = chunkStr.startsWith(responseText) ? chunkStr : responseText + chunkStr;
+        this.store.update({ rawOutputText: responseText });
+      }
+
+      const elapsedMs = Math.round(performance.now() - startTime);
+
+      this.store.update({
+        isPromptRunning: false,
+        statusText: `Respondio en ${elapsedMs} ms`,
+        statusKind: "ready",
+        rawOutputText: responseText,
+      });
+
+      onLog("live-chat-response-complete", { elapsedMs, responseLength: responseText.length });
+    } catch (err) {
+      onLog("live-chat-processing-error", { message: (err as Error).message });
+      this.store.update({ isPromptRunning: false, statusText: "Error en live chat", statusKind: "bad" });
+    }
   }
 }

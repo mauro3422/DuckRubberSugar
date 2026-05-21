@@ -23,6 +23,11 @@ LANGUAGE = os.environ.get("DUCKSUGAR_ASR_LANG", "es-AR")
 
 
 class DuckSugarHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, directory=None, **kwargs):
+        if directory is None:
+            directory = os.getcwd()
+        super().__init__(*args, directory=directory, **kwargs)
+
     def log_message(self, format, *args):
         print(f"[DuckSugar] {self.address_string()} - {format % args}", flush=True)
 

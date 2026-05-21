@@ -256,6 +256,7 @@ export type AppState = {
   isInitializing: boolean;
   isBenchmarkRunning: boolean;
   isPromptRunning: boolean;
+  isLiveChat: boolean;
   latestMetrics: Metrics | null;
   latestReport: Report | null;
   events: EventLog[];

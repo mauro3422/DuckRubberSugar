@@ -56,12 +56,14 @@ export interface AudioViewDelegate {
   onAudioDurationReady(durationMs: number): void;
   onSpeechFragment?(finalText: string, interimText: string): void;
   onAudioProgress?(partialBlob: Blob, elapsedMs: number): void;
+  onAudioChunk?(chunkBlob: Blob, elapsedMs: number, chunkIndex: number): void;
 }
 
 export class AudioService {
   public micTranscription: string | null = null;
   public recordedVolumeHistory: number[] = [];
   public silencePauseCount = 0;
+  public chunkedMode = false;
   
   private mediaRecorder: MediaRecorder | null = null;
   private mediaStream: MediaStream | null = null;
@@ -81,6 +83,14 @@ export class AudioService {
   private analyser: AnalyserNode | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private analysisInterval: number | null = null;
+
+  // Chunked processing state
+  private chunkDelegate: AudioViewDelegate | null = null;
+  private chunkOnLog: ((type: string, data?: Record<string, unknown>) => void) | null = null;
+  private chunkLang = "es-AR";
+  private chunkIndex = 0;
+  private chunkInterval: number | null = null;
+  private chunkDurationMs = 3000; // 3 seconds per chunk
 
   get isRecording(): boolean {
     return Boolean(this.mediaRecorder);
@@ -237,6 +247,140 @@ export class AudioService {
       onLog("speech-recognition-not-supported");
       resolveRecFinished(null);
     }
+  }
+
+  async startChunked(
+    delegate: AudioViewDelegate,
+    onLog: (type: string, data?: Record<string, unknown>) => void,
+    lang = "es-AR",
+    chunkDurationMs = 3000
+  ): Promise<void> {
+    this.chunkedMode = true;
+    this.chunkDelegate = delegate;
+    this.chunkOnLog = onLog;
+    this.chunkLang = lang;
+    this.chunkDurationMs = chunkDurationMs;
+    this.chunkIndex = 0;
+    this.audioChunks = [];
+    this.current = null;
+    this.startedAt = 0;
+    this.stoppedAt = 0;
+
+    delegate.clearFileSelection();
+    delegate.clearRunOutput();
+    delegate.setPlaybackUrl(null);
+    delegate.setRecordingState("Pidiendo microfono...");
+
+    this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    this.mediaRecorder = new MediaRecorder(this.mediaStream, {
+      mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : undefined,
+    });
+
+    // Collect chunks for final asset
+    this.mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) {
+        this.audioChunks.push(event.data);
+      }
+    });
+
+    this.mediaRecorder.start(1000);
+    this.startedAt = performance.now();
+    delegate.setRecordingState("Grabando en modo live...");
+    onLog("chunked-recording-started", { chunkDurationMs, mimeType: this.mediaRecorder.mimeType });
+
+    // Emit chunks every chunkDurationMs
+    this.chunkInterval = window.setInterval(() => {
+      if (!this.mediaRecorder || this.mediaRecorder.state === "inactive") return;
+      
+      // Request a new chunk from MediaRecorder
+      this.mediaRecorder.requestData();
+      
+      // The dataavailable event will fire, but we need to capture the chunk
+      // We'll use the last chunk from audioChunks
+      if (this.audioChunks.length > this.chunkIndex) {
+        const chunkBlob = this.audioChunks[this.chunkIndex];
+        const elapsed = Math.round(performance.now() - this.startedAt);
+        this.chunkIndex++;
+        delegate.onAudioChunk?.(chunkBlob, elapsed, this.chunkIndex);
+        onLog("audio-chunk-emitted", { chunkIndex: this.chunkIndex, size: chunkBlob.size, elapsedMs: elapsed });
+      }
+    }, chunkDurationMs);
+
+    // Initialize Web Audio API analysis
+    const AudioContextCtor = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (AudioContextCtor) {
+      try {
+        this.audioContext = new AudioContextCtor();
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256;
+        this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+        this.sourceNode.connect(this.analyser);
+
+        const bufferLength = this.analyser.fftSize;
+        const dataArray = new Float32Array(bufferLength);
+
+        this.analysisInterval = window.setInterval(() => {
+          if (!this.analyser) return;
+          this.analyser.getFloatTimeDomainData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i] * dataArray[i];
+          }
+          const rms = Math.sqrt(sum / bufferLength);
+          this.recordedVolumeHistory.push(rms);
+          if (rms < 0.015) {
+            this.silencePauseCount++;
+          }
+        }, 150);
+      } catch (err) {
+        onLog("audio-analysis-init-error", { message: (err as Error).message });
+      }
+    }
+
+    // Speech recognition for interim transcript
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognitionCtor) {
+      const recognition = new SpeechRecognitionCtor();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = lang;
+
+      let finalTranscript = "";
+      recognition.onresult = (event) => {
+        let interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+        this.micTranscription = finalTranscript.trim();
+        delegate.onSpeechFragment?.(finalTranscript.trim(), interimTranscript.trim());
+      };
+
+      recognition.onerror = (err) => {
+        onLog("speech-recognition-error", { error: err.error, message: err.message });
+      };
+
+      try {
+        recognition.start();
+        this.recognition = recognition;
+        onLog("speech-recognition-started", { lang });
+      } catch (err) {
+        onLog("speech-recognition-start-error", { message: (err as Error).message });
+      }
+    }
+  }
+
+  stopChunked(onLog: (type: string, data?: Record<string, unknown>) => void): void {
+    if (this.chunkInterval) {
+      clearInterval(this.chunkInterval);
+      this.chunkInterval = null;
+    }
+    this.chunkedMode = false;
+    this.stop(onLog);
   }
 
   stop(onLog: (type: string, data?: Record<string, unknown>) => void): void {

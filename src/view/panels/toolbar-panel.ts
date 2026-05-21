@@ -12,6 +12,7 @@ export class ToolbarPanel extends UIComponent {
   readonly clearBenchButton = this.must<HTMLButtonElement>("#clearBenchButton");
   readonly streamingToggle = this.must<HTMLInputElement>("#streamingToggle");
   readonly langSelect = this.must<HTMLSelectElement>("#langSelect");
+  readonly liveChatButton = this.must<HTMLButtonElement>("#liveChatButton");
   
   constructor() {
     super(document.body);
@@ -26,18 +27,22 @@ export class ToolbarPanel extends UIComponent {
     isInitializing: boolean;
     isPromptRunning: boolean;
     isBenchmarkRunning: boolean;
+    isLiveChat: boolean;
   }): void {
     const busy = options.isInitializing || options.isPromptRunning || options.isBenchmarkRunning;
     this.recordButton.disabled =
-      !options.hasApi || !options.hasSession || options.isRecording || busy;
+      !options.hasApi || !options.hasSession || options.isRecording || busy || options.isLiveChat;
     this.stopButton.disabled = !options.isRecording || options.isBenchmarkRunning;
-    this.sendButton.disabled = !options.hasApi || !options.hasAudio || options.isRecording || busy;
-    this.runBenchButton.disabled = !options.hasApi || !options.hasAudio || options.isRecording || busy;
-    this.runDatasetButton.disabled = !options.hasApi || options.isRecording || busy;
-    this.copyLogButton.disabled = options.isBenchmarkRunning;
-    this.copyBenchButton.disabled = options.isBenchmarkRunning;
-    this.copyCodexButton.disabled = options.isBenchmarkRunning;
-    this.clearBenchButton.disabled = options.isBenchmarkRunning;
+    this.sendButton.disabled = !options.hasApi || !options.hasAudio || options.isRecording || busy || options.isLiveChat;
+    this.runBenchButton.disabled = !options.hasApi || !options.hasAudio || options.isRecording || busy || options.isLiveChat;
+    this.runDatasetButton.disabled = !options.hasApi || options.isRecording || busy || options.isLiveChat;
+    this.copyLogButton.disabled = options.isBenchmarkRunning || options.isLiveChat;
+    this.copyBenchButton.disabled = options.isBenchmarkRunning || options.isLiveChat;
+    this.copyCodexButton.disabled = options.isBenchmarkRunning || options.isLiveChat;
+    this.clearBenchButton.disabled = options.isBenchmarkRunning || options.isLiveChat;
+    this.liveChatButton.disabled = !options.hasApi || options.isBenchmarkRunning;
+    this.liveChatButton.classList.toggle("active", options.isLiveChat);
+    this.liveChatButton.textContent = options.isLiveChat ? "Detener Live" : "Live Chat";
   }
 
   setRecordingVisual(isRecording: boolean): void {

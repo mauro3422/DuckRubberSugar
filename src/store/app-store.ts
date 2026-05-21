@@ -9,6 +9,7 @@ export class AppStore {
     isInitializing: false,
     isBenchmarkRunning: false,
     isPromptRunning: false,
+    isLiveChat: false,
     latestMetrics: null,
     latestReport: null,
     events: [],
