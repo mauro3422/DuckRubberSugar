@@ -6,11 +6,17 @@ export class PromptExecutor {
   async measureContextUsage(targetSession: LanguageModelSession, prompt: LanguageModelPrompt): Promise<unknown> {
     if (typeof targetSession.measureContextUsage !== "function") return null;
     try {
-      return await targetSession.measureContextUsage(prompt, PromptOptionsConfig);
+      const result = await Promise.race([
+        targetSession.measureContextUsage(prompt, PromptOptionsConfig),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+      ]);
+      if (result === null) return { error: "timeout after 5s" };
+      return result;
     } catch (error) {
       return { error: (error as Error).message };
     }
   }
+
 
   async runPrompt(
     targetSession: LanguageModelSession,

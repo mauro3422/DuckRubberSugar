@@ -1,876 +1,756 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gemini Nano XML & JSON Experimenter</title>
-  <style>
-    :root {
-      --bg: #090d16;
-      --panel: #111827;
-      --text: #f3f4f6;
-      --accent: #38bdf8;
-      --accent-hover: #0ea5e9;
-      --border: #1f2937;
-      --highlight: #10b981;
-      --warning: #f59e0b;
-    }
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
-      padding: 24px;
-      margin: 0;
-      line-height: 1.5;
-    }
-    main {
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-    h1 {
-      color: var(--accent);
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 12px;
-      margin-top: 0;
-      font-weight: 800;
-      font-size: 2.2rem;
-      background: linear-gradient(to right, #38bdf8, #818cf8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      margin-top: 24px;
-    }
-    @media (max-width: 768px) {
-      .grid { grid-template-columns: 1fr; }
-    }
-    .panel {
-      background-color: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    .panel h3 {
-      margin-top: 0;
-      font-size: 1.25rem;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 8px;
-    }
-    label {
-      display: block;
-      font-weight: 600;
-      margin-top: 14px;
-      margin-bottom: 6px;
-      color: #9ca3af;
-      font-size: 0.9rem;
-    }
-    textarea, select, input {
-      width: 100%;
-      background: #030712;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 10px;
-      border-radius: 6px;
-      box-sizing: border-box;
-      font-family: 'Fira Code', monospace;
-      font-size: 0.9rem;
-      transition: border-color 0.2s;
-    }
-    textarea:focus, select:focus, input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    .btn-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 18px;
-    }
-    button {
-      background-color: var(--accent);
-      color: #030712;
-      font-weight: bold;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-size: 0.95rem;
-    }
-    button:hover {
-      background-color: var(--accent-hover);
-      transform: translateY(-1px);
-    }
-    button:active {
-      transform: translateY(0);
-    }
-    button:disabled {
-      background-color: #374151;
-      color: #6b7280;
-      cursor: not-allowed;
-      transform: none;
-    }
-    pre {
-      background: #030712;
-      padding: 14px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      overflow-x: auto;
-      min-height: 120px;
-      white-space: pre-wrap;
-      word-break: break-all;
-      font-family: 'Fira Code', monospace;
-      font-size: 0.85rem;
-    }
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 12px;
-    }
-    .metric-card {
-      background: #030712;
-      border: 1px solid var(--border);
-      padding: 10px 12px;
-      border-radius: 6px;
-    }
-    .metric-card div {
-      font-size: 0.8rem;
-      color: #9ca3af;
-    }
-    .metric-card span {
-      font-size: 1rem;
-      font-weight: bold;
-      color: var(--text);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 14px;
-      font-size: 0.85rem;
-    }
-    th, td {
-      padding: 10px 12px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-    th {
-      font-weight: 600;
-      color: #9ca3af;
-      background-color: #030712;
-    }
-    tr:hover td {
-      background-color: rgba(56, 189, 248, 0.03);
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DuckSugar: Test de Formatos y Bugs</title>
+<style>
+  :root {
+    --bg: #090d16; --panel: #111827; --text: #f3f4f6; --accent: #38bdf8;
+    --border: #1f2937; --highlight: #10b981; --warning: #f59e0b; --danger: #ef4444;
+  }
+  body {
+    background: var(--bg); color: var(--text); font-family: system-ui, sans-serif;
+    padding: 24px; margin: 0; line-height: 1.5;
+  }
+  main { max-width: 1100px; margin: 0 auto; }
+  h1 {
+    color: var(--accent); border-bottom: 2px solid var(--border); padding-bottom: 12px;
+    font-weight: 800; font-size: 2rem;
+    background: linear-gradient(to right, #38bdf8, #818cf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .panel h3 { margin: 0 0 12px 0; font-size: 1.2rem; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  label { font-weight: 600; color: #9ca3af; font-size: 0.9rem; margin-bottom: 4px; display: block; }
+  textarea, select, input {
+    width: 100%; background: #030712; border: 1px solid var(--border); color: var(--text);
+    padding: 10px; border-radius: 6px; box-sizing: border-box; font-family: 'Fira Code', monospace;
+    font-size: 0.9rem;
+  }
+  textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent); color: #030712; font-weight: bold; border: none;
+    padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 0.95rem;
+    transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.85; }
+  button:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+  pre {
+    background: #030712; padding: 14px; border-radius: 6px; border: 1px solid var(--border);
+    overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+    font-family: 'Fira Code', monospace; font-size: 0.85rem; min-height: 80px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; color: #9ca3af; background: #030712; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; margin: 1px; }
+  .badge.fail { background: rgba(239,68,68,0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .badge.pass { background: rgba(16,185,129,0.2); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+  .badge.warn { background: rgba(245,158,11,0.2); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+  .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .mt-2 { margin-top: 12px; }
+  .w-100 { width: 100%; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+  .big-log { min-height: 200px; font-size: 0.8rem; }
+</style>
 </head>
 <body>
-  <main>
-    <h1>🧪 Gemini Nano: Experimento XML, JSON e Híbrido</h1>
-    <p style="color: #9ca3af; margin-top: -8px; margin-bottom: 20px;">Página aislada de pruebas y benchmarks rápidos de estructuración y velocidad.</p>
+<main>
+  <h1> DuckSugar: Test de Formatos y Bugs</h1>
+  <p style="color:#9ca3af;margin-top:-8px;">Prueba JSON (con responseConstraint), XML, e Híbrido. Detecta bugs automáticamente.</p>
 
-    <div class="panel" style="margin-bottom: 24px;">
-      <h3>1. Comprobar disponibilidad</h3>
-      <button id="checkBtn">Comprobar API de Gemini Nano</button>
-      <div id="availStatus" style="font-size: 0.9rem; color: #9ca3af; margin-top: 12px;">Sin comprobar. Haga clic en el botón.</div>
+  <div class="panel">
+    <div class="flex">
+      <button id="checkBtn"> Comprobar API</button>
+      <span id="availStatus" style="color:#9ca3af;font-size:0.9rem;">Sin comprobar</span>
     </div>
+  </div>
 
-    <div class="grid">
-      <!-- PANEL DE CONFIGURACIÓN -->
-      <div class="panel">
-        <h3>2. Configurar Prueba</h3>
-        
-        <label for="expType">Formato esperado de salida:</label>
-        <select id="expType">
-          <option value="json">JSON Completo (Original)</option>
-          <option value="xml">XML Puro (Sin responseConstraint)</option>
-          <option value="hybrid">Híbrido (JSON con XML adentro)</option>
-        </select>
-
-        <label for="systemPrompt">System Prompt:</label>
-        <textarea id="systemPrompt" rows="9"></textarea>
-
-        <label for="userPrompt">User Prompt:</label>
-        <textarea id="userPrompt" rows="4"></textarea>
-
-        <div class="btn-group">
-          <button id="runBtn" disabled>Ejecutar Prompt (Streaming)</button>
-          <button id="runCompareBtn" disabled style="background-color: var(--highlight);">⚡ Ejecutar Comparativa</button>
-        </div>
+  <div class="grid-2">
+    <div class="panel">
+      <h3>1. Test Individual</h3>
+      <label>Formato</label>
+      <select id="expType">
+        <option value="json">JSON con responseConstraint</option>
+        <option value="xml">XML puro</option>
+        <option value="hybrid">JSON + responseConstraint</option>
+        <option value="xml-prefix">XML con prefix pre-fill</option>
+      </select>
+      <div class="flex mt-2">
+        <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:400;color:#9ca3af;font-size:0.85rem;">
+          <input type="checkbox" id="useSketchToggle" checked> Simular [CODE SKETCH] (pipeline real)
+        </label>
       </div>
-
-      <!-- PANEL DE RESULTADOS EN TIEMPO REAL -->
-      <div class="panel">
-        <h3>3. Resultado del Modelo</h3>
-        <label>Salida en tiempo real:</label>
-        <pre id="outputArea">Esperando ejecución...</pre>
-        
-        <label>Métricas de Rendimiento Individual</label>
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div>Tiempo Total</div>
-            <span id="metricTime">-</span>
-          </div>
-          <div class="metric-card">
-            <div>Primer Token (TTFT)</div>
-            <span id="metricFirstToken">-</span>
-          </div>
-          <div class="metric-card">
-            <div>Velocidad Neta</div>
-            <span id="metricSpeed">-</span>
-          </div>
-          <div class="metric-card">
-            <div>Parseo Válido</div>
-            <span id="metricParse">-</span>
-          </div>
-        </div>
+      <label class="mt-2">Input (voz simulada)</label>
+      <textarea id="userPrompt" rows="2">el codigo es printf parentesis comilla Hola mundo comilla punto y coma</textarea>
+      <div class="flex mt-2">
+        <button id="runBtn" disabled> Ejecutar</button>
+        <button id="runAllBtn" disabled style="background:#6366f1;">⚡ Todos los formatos</button>
       </div>
+      <div class="flex mt-2" style="gap:8px;">
+        <span id="metricTime" style="color:#9ca3af;font-size:0.85rem;">-</span>
+        <span id="metricParse" style="color:#9ca3af;font-size:0.85rem;">-</span>
+      </div>
+      <pre id="bugOutput" style="margin-top:8px;min-height:40px;">(bugs aquí)</pre>
     </div>
-
-    <!-- COMPARADOR DE BENCHMARKS INDIVIDUAL -->
-    <div class="panel" style="margin-top: 24px;">
-      <h3>📊 Resultados Comparativos de la Prueba</h3>
-      <div style="overflow-x: auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Formato</th>
-              <th>1er Token (ms)</th>
-              <th>Generación Activa (ms)</th>
-              <th>Tiempo Total (ms)</th>
-              <th>Velocidad (Tok/s)</th>
-              <th>Tamaño (Chars)</th>
-              <th>Parseo</th>
-            </tr>
-          </thead>
-          <tbody id="compareBody">
-            <tr>
-              <td colspan="7" style="padding: 16px; text-align: center; color: #6b7280;">No se han ejecutado pruebas comparativas aún. Haga clic en <strong>⚡ Ejecutar Comparativa</strong>.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div style="margin-top: 24px;">
-        <label>📋 Resumen JSON para Logs</label>
-        <textarea id="logSummary" rows="6" readonly placeholder="El JSON de resultados del benchmark aparecerá aquí para ser copiado..." style="font-size: 0.8rem; background: #030712; border-color: var(--border);"></textarea>
-        <button id="copyLogBtn" style="margin-top: 12px; background-color: #6366f1; display: none;">📋 Copiar Resumen Técnico</button>
-      </div>
+    <div class="panel">
+      <h3>Resultado</h3>
+      <pre id="outputArea">Esperando...</pre>
     </div>
+  </div>
 
-    <!-- SUITE DE PRUEBAS MASIVAS AUTOMATIZADAS -->
-    <div class="panel" style="margin-top: 24px;">
-      <h3>📊 Suite de Pruebas Masivas Automatizadas (45 Corridas)</h3>
-      <p style="color: #9ca3af; margin-top: -6px; font-size: 0.9rem;">Ejecuta secuencialmente 15 casos simulando dictados de voz reales (Fáciles, Medios y Difíciles con cortes de palabras y lagunas) sobre los 3 formatos para calcular promedios robustos.</p>
-      
-      <div class="btn-group" style="margin-bottom: 16px;">
-        <button id="runSuiteBtn" disabled style="background-color: #6366f1; color: #ffffff;">🚀 Iniciar Suite Masiva</button>
-        <button id="stopSuiteBtn" disabled style="background-color: #ef4444; color: #ffffff;">⏹️ Detener Suite</button>
-      </div>
-
-      <div id="suiteStatus" style="font-size: 0.95rem; font-weight: bold; color: var(--accent); margin-bottom: 14px; min-height: 24px;">Esperando inicio...</div>
-      
-      <h4>Promedios Consolidados por Formato</h4>
-      <div style="overflow-x: auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Formato</th>
-              <th>Promedio TTFT (ms)</th>
-              <th>Promedio Activo (ms)</th>
-              <th>Promedio Total (ms)</th>
-              <th>Promedio Velocidad (Tok/s)</th>
-              <th>Tasa Éxito Parseo</th>
-              <th>Timeouts / Bucles</th>
-            </tr>
-          </thead>
-          <tbody id="suiteSummaryBody">
-            <tr>
-              <td colspan="7" style="padding: 16px; text-align: center; color: #6b7280;">Presiona <strong>Iniciar Suite Masiva</strong> para calcular promedios globales.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div style="margin-top: 24px;">
-        <label>📋 JSON Consolidado de la Suite (Logs Completos)</label>
-        <textarea id="suiteLogSummary" rows="6" readonly placeholder="El JSON masivo consolidado aparecerá aquí para ser copiado..." style="font-size: 0.8rem; background: #030712; border-color: var(--border);"></textarea>
-        <button id="copySuiteLogBtn" style="margin-top: 12px; background-color: #6366f1; display: none;">📋 Copiar JSON de la Suite</button>
-      </div>
+  <div class="panel">
+    <h3>2. Suite de Bugs (15 tests × 3 formatos)</h3>
+    <div class="flex">
+      <button id="runSuiteBtn" disabled style="background:#6366f1;"> Iniciar Suite</button>
+      <button id="stopSuiteBtn" disabled style="background:#ef4444;">⏹ Detener</button>
+      <span id="suiteStatus" style="color:var(--accent);font-size:0.9rem;">Listo</span>
     </div>
-  </main>
+    <div style="overflow-x:auto;margin-top:12px;">
+      <table>
+        <thead><tr>
+          <th>Formato</th><th>TTFT (ms)</th><th>Total (ms)</th><th>Tok/s</th>
+          <th>Parseo</th><th>Timeout</th><th>Bugs</th><th>Fallback</th>
+        </tr></thead>
+        <tbody id="suiteBody">
+          <tr><td colspan="8" style="text-align:center;color:#6b7280;">Ejecutar suite para ver resultados</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="overflow-x:auto;margin-top:12px;">
+      <table>
+        <thead><tr><th>Bug</th><th id="bugHeader1">json</th><th id="bugHeader2">xml</th></tr></thead>
+        <tbody id="bugBody">
+          <tr><td colspan="3" style="text-align:center;color:#6b7280;">(pendiente)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-  <script>
-    const checkBtn = document.getElementById('checkBtn');
-    const runBtn = document.getElementById('runBtn');
-    const runCompareBtn = document.getElementById('runCompareBtn');
-    const runSuiteBtn = document.getElementById('runSuiteBtn');
-    const stopSuiteBtn = document.getElementById('stopSuiteBtn');
-    
-    const expType = document.getElementById('expType');
-    const systemPrompt = document.getElementById('systemPrompt');
-    const userPrompt = document.getElementById('userPrompt');
-    const outputArea = document.getElementById('outputArea');
-    const availStatus = document.getElementById('availStatus');
+  <div class="panel">
+    <h3>3. Historial de Benchmarks</h3>
+    <div class="flex">
+      <button id="clearHistoryBtn" style="background:#ef4444;"> Borrar historial</button>
+      <span id="historyCount" style="color:#9ca3af;font-size:0.85rem;"></span>
+    </div>
+    <div style="overflow-x:auto;margin-top:8px;" id="historyContainer">
+      <p style="color:#6b7280;font-size:0.9rem;">(los resultados de la suite se guardan automáticamente)</p>
+    </div>
+  </div>
 
-    const metricTime = document.getElementById('metricTime');
-    const metricFirstToken = document.getElementById('metricFirstToken');
-    const metricSpeed = document.getElementById('metricSpeed');
-    const metricParse = document.getElementById('metricParse');
+  <div class="panel">
+    <h3>4. Log Completo</h3>
+    <div class="flex">
+      <button id="copyBtn" style="background:#6366f1;"> Copiar JSON</button>
+      <span id="copyStatus" style="color:#9ca3af;font-size:0.85rem;"></span>
+    </div>
+    <textarea id="logArea" class="big-log w-100 mt-2" readonly placeholder="El JSON de resultados aparecerá aquí..."></textarea>
+  </div>
+</main>
 
-    const compareBody = document.getElementById('compareBody');
-    const logSummary = document.getElementById('logSummary');
-    const copyLogBtn = document.getElementById('copyLogBtn');
+<script>
+const $ = id => document.getElementById(id);
 
-    const suiteStatus = document.getElementById('suiteStatus');
-    const suiteSummaryBody = document.getElementById('suiteSummaryBody');
-    const suiteLogSummary = document.getElementById('suiteLogSummary');
-    const copySuiteLogBtn = document.getElementById('copySuiteLogBtn');
+let aiApi = null;
+let shouldStop = false;
+let allSuiteResults = [];
+let suiteFormats = ['json','xml'];
+// Set initial bug table colspan
+$('bugBody').innerHTML = `<tr><td colspan="${suiteFormats.length+1}" style="text-align:center;color:#6b7280;">(pendiente)</td></tr>`;
+const HISTORY_KEY = 'ducksugar_benchmark_history';
 
-    const TEST_CASES = [
-      // Fáciles
-      { id: "tc_easy_1", difficulty: "Fácil", user: "crear una variable llamada contador igual a cero punto y coma" },
-      { id: "tc_easy_2", difficulty: "Fácil", user: "declarar constante texto igual a comillas hola comillas" },
-      { id: "tc_easy_3", difficulty: "Fácil", user: "imprimir en consola el valor de contador" },
-      { id: "tc_easy_4", difficulty: "Fácil", user: "crear una funcion llamada inicializar vacia" },
-      { id: "tc_easy_5", difficulty: "Fácil", user: "retornar verdadero punto y coma" },
-      // Medios
-      { id: "tc_medium_1", difficulty: "Medio", user: "si notas filtradas punto length es mayor a cero entonces hacer un map" },
-      { id: "tc_medium_2", difficulty: "Medio", user: "crear una funcion flecha llamada filtrar que reciba nota y devuelva nota punto id" },
-      { id: "tc_medium_3", difficulty: "Medio", user: "definir activeClass igual a nota punto id igual igual igual noteActiveId signo de pregunta comillas active comillas dos puntos comillas comillas" },
-      { id: "tc_medium_4", difficulty: "Medio", user: "si noteCount es verdadero entonces cambiar textContent a notasFiltradas punto length" },
-      { id: "tc_medium_5", difficulty: "Medio", user: "crear constante lista igual a un array vacio punto y coma" },
-      // Difíciles (Desaparición de Palabras, Cortes, Silencios y Estiramientos)
-      { id: "tc_hard_1", difficulty: "Difícil", user: "crear constante ... ... no notasFiltradas ... ... noteList punto filter" },
-      { id: "tc_hard_2", difficulty: "Difícil", user: "let contador ... ... ... despues hacer contador mas mas" },
-      { id: "tc_hard_3", difficulty: "Difícil", user: "si active claaaaas ... ... activeClass es igual a ... ... innerHTML igual a vacio" },
-      { id: "tc_hard_4", difficulty: "Difícil", user: "hacer un if de ... ... ... si noteCount existe hacer noteCount punto textContent igual a vacio" },
-      { id: "tc_hard_5", difficulty: "Difícil", user: "const render igual a ... ... arrow function ... ... id" }
-    ];
+// Benchmark history (persistido en localStorage)
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]'); } catch { return []; }
+}
+function saveHistory(entry) {
+  const h = loadHistory();
+  h.push(entry);
+  if (h.length > 20) h.splice(0, h.length-20); // max 20
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h, null, 2));
+  renderHistory();
+}
+function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+}
+function renderHistory() {
+  const h = loadHistory();
+  $('historyCount').textContent = `${h.length} corridas guardadas`;
+  if (!h.length) {
+    $('historyContainer').innerHTML = '<p style="color:#6b7280;font-size:0.9rem;">(los resultados de la suite se guardan automáticamente)</p>';
+    return;
+  }
+  const fmts = suiteFormats;
+  let html = '<table><thead><tr><th>#</th><th>Fecha</th>';
+  fmts.forEach(f => {
+    const c = f==='json'?'#38bdf8':f==='xml'?'#f59e0b':'#10b981';
+    html += `<th style="color:${c}">${f.toUpperCase()}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  h.forEach((entry, i) => {
+    html += `<tr><td>${i+1}</td><td style="font-size:0.8rem;color:#9ca3af">${entry.label||''}</td>`;
+  // Update bug table headers for dynamic format count
+  const bugThead = document.querySelector('#bugBody').previousElementSibling;
+  if (bugThead) {
+    bugThead.innerHTML = `<tr><th>Bug</th>${fmts.map(f => `<th>${f}</th>`).join('')}</tr>`;
+  }
 
-    const PROMPTS = {
-      json: {
-        system: `You are a technical coding assistant. Return ONLY valid JSON.
-Use exactly this shape: {"think":"","transcript":"","code":""}
-Keep fields in this order: think, transcript, code.
-think: analyze phonetic corrections or ambiguity before writing the code.
-transcript: literal transcript.
-code: isolated programming statement.`,
-        user: `Dictado de voz del usuario: "crear una variable llamada contador igual a 0 punto y coma"`
+  fmts.forEach(f => {
+      const s = entry.summary?.[f];
+      if (!s) { html += '<td style="color:#6b7280">-</td>'; return; }
+      const parseColor = s.parseRate >= 80 ? '#10b981' : s.parseRate >= 50 ? '#f59e0b' : '#ef4444';
+      const bugColor = s.bugCount ? '#ef4444' : '#10b981';
+      html += `<td style="font-size:0.8rem">
+        <span style="color:${parseColor}">${s.parseRate}%</span>
+        <span style="color:#6b7280"> / </span>
+        <span style="color:${bugColor}">${s.bugCount}bug</span>
+        <span style="color:#6b7280"> / </span>
+        <span style="color:#9ca3af">${s.avgTotal}ms</span>
+      </td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  $('historyContainer').innerHTML = html;
+}
+
+// Prompts específicos por formato (todos con la misma lógica, solo cambia el formato de salida)
+function getPrompt(format) {
+  const base = `You are DuckRubber, a local technical rubber-duck for Spanish or English voice input.
+You receive a transcription AND a [CODE SKETCH] from a local normalizer.
+Your job is to VALIDATE and CORRECT the sketch, not to write it from scratch.`;
+
+  const rules = `
+RULES:
+- think: Internal audit note in ENGLISH. Max 12 words.
+- tags: Max 8 comma-separated tags. If chat, include 'charla'.
+- transcript: Copy the received transcription verbatim.
+- code: Clean code only. No '>' prefixes. Do not turn '$var' into '%s'.
+  NEVER remove $variable or template interpolation from [CODE SKETCH]. Preserve them exactly.
+  If user chats (no code), leave empty.
+  CRITICAL: If [CODE SKETCH] has content, NEVER leave code empty. Return the corrected code.
+- answer: MAX 15 words. No greetings. If sketch is complete: 'Done.' or 'Corrected.'
+- directed: true if audio is directed at assistant.
+- lang: es or en.
+- needs_context: true if you need more IDE context.
+
+IMPORTANT: The normalizer already translated spoken punctuation into symbols.
+You only need to fix invalid syntax, not re-translate.
+Dollar signs and template syntax are valid JS. Do NOT escape them in JSON.
+Do NOT use Markdown code fences.`;
+
+  if (format === 'xml' || format === 'xml-prefix') {
+    return `${base}
+Return ONLY valid XML inside <response></response> with these elements:
+<think></think> <tags></tags> <transcript></transcript> <code></code>
+<answer></answer> <directed></directed> <lang></lang>
+<needs_context></needs_context> <phonetic_corrections></phonetic_corrections>
+${rules}
+Only raw XML. No JSON. No markdown.`;
+  }
+
+  if (format === 'json') {
+    return `${base}
+Return ONLY valid JSON matching this schema:
+{"think":"","tags":"","transcript":"","code":"","answer":"","directed":true,"lang":"es","needs_context":false}
+Examples:
+- Good: {"code":"printf(\"total %d\", monto);"}
+- Good: {"code":"console.log(\"$name\");"}
+- Bad: {"code":"printf(\"total $\"$monto\");"}
+- Bad: {"code":"printf(\"Hola mundo.\");"} when sketch has $variable
+${rules}
+Only raw JSON. No XML. No markdown. No code fences.`;
+  }
+
+  // Hybrid = JSON con responseConstraint. Mismos 8 campos que JSON.
+  return `${base}
+Return ONLY valid JSON matching this schema:
+{"think":"","tags":"","transcript":"","code":"","answer":"","directed":true,"lang":"es","needs_context":false}
+Examples:
+- Good: {"code":"printf(\"total %d\", monto);"}
+- Good: {"code":"console.log(\"$name\");"}
+- Bad: {"code":"printf(\"total $\"$monto\");"}
+- Bad: {"code":"printf(\"Hola mundo.\");"} when sketch has $variable
+${rules}
+Only raw JSON. No XML. No markdown. No code fences.`;
+}
+
+// 15 bug test cases — ahora con sketch simulado (lo que produciría SpeechNormalizer)
+const CASES = [
+  { id:"BUG-01", desc:"Printf hola mundo",
+    input:"el codigo es printf parentesis comilla Hola mundo comilla punto y coma",
+    sketch:'printf("Hola mundo"):', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true },
+  { id:"BUG-02", desc:"Printf + $variable (NO %s)",
+    input:"printf parentesis comilla valor signo pesos var comilla punto y coma",
+    sketch:'printf("valor $var"):', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true, noPctS:true },
+  { id:"BUG-03", desc:"Printf + ${...}",
+    input:"printf parentesis comilla total signo pesos llave monto llave comilla punto y coma",
+    sketch:'printf("total ${monto}"):', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true },
+  { id:"BUG-04", desc:"If not count",
+    input:"if not count",
+    sketch:"if (!count)", tags:["spoken_not_condition"],
+    expectHasCode:true },
+  { id:"BUG-05", desc:"Console.log",
+    input:"consola punto log parentesis comilla test comilla punto y coma",
+    sketch:"console.log('test');", tags:["spoken_symbol_normalization"],
+    expectHasCode:true },
+  { id:"BUG-06", desc:"Arrow function",
+    input:"const suma igual parentesis a coma b parentesis flecha a mas b",
+    sketch:"const suma=(a,b) => a + b", tags:["spoken_symbol_normalization","arrow_function"],
+    expectHasCode:true },
+  { id:"BUG-07", desc:"let declaration (NO perder let)",
+    input:"let x igual 10",
+    sketch:"let x=10", tags:["spoken_symbol_normalization"],
+    expectHasCode:true, expectLet:true },
+  { id:"BUG-08", desc:"Charla (code vacio)",
+    input:"Hola como estas todo bien espero que si",
+    sketch:"", tags:[],
+    expectNoCode:true },
+  { id:"BUG-09", desc:"Context lexicon",
+    input:"mostrar note list filtrada", context:"identificadores_visibles: noteList, notasFiltradas, noteCount, activeClass",
+    sketch:"", tags:["context_lexicon_reconstruction"],
+    expectNoCode:true },
+  { id:"BUG-10", desc:"Dictation stutter",
+    input:"printf parentesis comilla comilla hola comilla punto y coma",
+    sketch:'printf("hola"):', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true },
+  { id:"BUG-11", desc:"Dolar spanglish (NO %s)",
+    input:"printf parenthesis quote hello dollar name quote semicolon",
+    sketch:'printf("hello $name"):', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true, noPctS:true },
+  { id:"BUG-12", desc:"Mispronunciation esprint f",
+    input:"esprint f parentesis comilla hola comilla punto y coma",
+    sketch:'printf("hola"):', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true },
+  { id:"BUG-13", desc:".map array",
+    input:"items punto map parentesis item flecha item punto id parentesis",
+    sketch:"items.map(item => item.id)", tags:["spoken_symbol_normalization","map"],
+    expectHasCode:true },
+  { id:"BUG-14", desc:"If equality ===",
+    input:"if parentesis x igual igual igual 5 parentesis abrir llave cerrar llave",
+    sketch:"if(x===5){}", tags:["spoken_symbol_normalization","condition"],
+    expectHasCode:true },
+  { id:"BUG-15", desc:"Repro bug original (NO %s)",
+    input:"Hola como estas justamente el codigo es printf parentesis comilla Hola mundo comilla punto signo pesos variable parentesis comilla punto y coma",
+    sketch:'printf("Hola mundo. $variable");', tags:["spoken_print_call","probable_punctuation"],
+    expectHasCode:true, noPctS:true },
+];
+
+// Bug detection
+function detectBugs(text, format, tc) {
+  const bugs = [];
+  if (!text) return bugs;
+  const code = extractCode(text, format, tc?.input || '');
+  const tags = extractTags(text, format);
+
+  if (code && /^[>\s]+/.test(code)) bugs.push({ id:"PREFIJO_>", sev:"fail", label:`Prefijo >: "${code.slice(0,20)}"` });
+  if (code && tc && tc.noPctS && /%s/.test(code)) bugs.push({ id:"VAR_A_%s", sev:"fail", label:`$var→%s en: "${code.slice(0,40)}"` });
+  if (code && tc && tc.expectLet && !/^let\b/.test(code.trim())) bugs.push({ id:"LET_OMIT", sev:"fail", label:`Se esperaba let, se obtuvo: "${code.slice(0,30)}"` });
+  if (tc && tc.expectNoCode && code) bugs.push({ id:"CHARLA_CODE", sev:"warn", label:`Charla con código: "${code.slice(0,30)}"` });
+  if (tc && tc.expectHasCode && !code) bugs.push({ id:"CODE_VACIO", sev:"fail", label:"Código vacío cuando se esperaba" });
+
+  // Check for malformed XML tags in raw XML formats
+  if ((format==='xml'||format==='xml-prefix') && (text.includes('</<')||text.includes('<>'))) {
+    bugs.push({ id:"XML_ROTO", sev:"fail", label:"XML tags rotas" });
+  }
+
+  // Check tags quality (not prose)
+  if (tags.length > 0) {
+    const longWords = tags.filter(t => t.length > 8 || /\s/.test(t)).length;
+    if (longWords > 2) bugs.push({ id:"TAGS_PROSA", sev:"warn", label:`Tags como prosa: "${tags.slice(0,3).join(',')}"` });
+  }
+  return bugs;
+}
+
+function extractCode(text, format, transcript) {
+  if (!text) return "";
+  if (format==='json') {
+    try {
+      const o = JSON.parse(text.replace(/^```.*\n?/,'').replace(/\n?```$/,''));
+      return fixJsonCode(o.code||o.c||"", transcript);
+    } catch { return ""; }
+  }
+  if (format==='hybrid') {
+    try {
+      const o = JSON.parse(text.replace(/^```.*\n?/,'').replace(/\n?```$/, ''));
+      return fixJsonCode(o.code||o.c||"", transcript);
+    } catch { return ""; }
+  }
+  const m = text.match(/<code>([\s\S]*?)<\/code>/i);
+  return m ? fixXmlCode(m[1].trim(), transcript) : "";
+}
+
+// Post-processing fixes for each format (mimics json-tools.ts production pipeline)
+function fixJsonCode(code, transcript) {
+  if (!code) return code;
+  let c = code;
+  c = c.replace(/,(\s*[;)])/g, '$1');                             // Fix 1: coma antes de ; o )
+  c = c.replace(/,\s*$/, '');                                      // Fix 1b: coma al final
+  c = c.replace(/(\b(?:printf?|console\.log|print|write|writeln|alert|confirm|prompt)\s+)("(?:[^"\\]|\\.)*")/gi, '$1($2)');  // Fix 2: paréntesis faltantes
+  c = c.replace(/(\b(?:printf?|console\.log|print|write|writeln|alert|confirm|prompt)\s+)('(?:[^'\\]|\\.)*')/gi, '$1($2)');
+  c = c.replace(/\\\$/g, '$');                                    // Fix 3: \$ → $
+  c = c.replace(/\$\$/g, '$');                                     // Fix 3b: $$ → $
+  // Fix 4: %s → $var if transcript mentions dollar
+  if (/%s/.test(c) && transcript) {
+    const hasDollar = /\b(signo\s+pesos?|dolar|dólar|dollar|signo\s+dolar|pesos)\b/i.test(transcript);
+    if (hasDollar) {
+      const varMatch = transcript.toLowerCase().match(/\b(signo\s+pesos?|dolar|dólar|dollar|pesos)\s+([a-zA-Z_]\w*)\b/i);
+      c = c.replace(/%[sd]/g, varMatch ? `$${varMatch[2]}` : '$');
+    }
+  }
+  return c;
+}
+function fixXmlCode(code, transcript) {
+  if (!code) return code;
+  let c = code.replace(/&amp;/g, '&').replace(/\$\$/g, '$');   // Unescape HTML entities, fix $$
+  // restore $var on %s if transcript mentions dollar
+  if (/%s/.test(c) && transcript) {
+    const hasDollar = /\b(signo\s+pesos?|dolar|dólar|dollar|signo\s+dolar|pesos)\b/i.test(transcript);
+    if (hasDollar) {
+      const varMatch = transcript.toLowerCase().match(/\b(signo\s+pesos?|dolar|dólar|dollar|pesos)\s+([a-zA-Z_]\w*)\b/i);
+      c = c.replace(/%[sd]/g, varMatch ? `$${varMatch[2]}` : '$');
+    }
+  }
+  return c;
+}
+function fixHybridCode(code, transcript) {
+  if (!code) return code;
+  let c = code;
+  c = c.replace(/<\/?script[^>]*>/gi, '');                     // Strip script tags
+  c = c.replace(/&amp;/g, '&');                                 // Unescape HTML entities
+  c = c.replace(/\\\$/g, '$');                                  // Unescape dollar
+  if (/%s/.test(c) && transcript) {
+    const hasDollar = /\b(signo\s+pesos?|dolar|dólar|dollar|signo\s+dolar|pesos)\b/i.test(transcript);
+    if (hasDollar) {
+      const varMatch = transcript.toLowerCase().match(/\b(signo\s+pesos?|dolar|dólar|dollar|pesos)\s+([a-zA-Z_]\w*)\b/i);
+      c = c.replace(/%[sd]/g, varMatch ? `$${varMatch[2]}` : '$');
+    }
+  }
+  return c;
+}
+
+function extractTags(text, format) {
+  if (!text) return [];
+  if (format==='json') {
+    try {
+      const o = JSON.parse(text.replace(/^```.*\n?/,'').replace(/\n?```$/,''));
+      const r = o.tags||o.tag||o.thought_tags||"";
+      return Array.isArray(r) ? r : r.split(/[,\s]+/).filter(Boolean);
+    } catch { return []; }
+  }
+  if (format==='hybrid') {
+    try {
+      const o = JSON.parse(text.replace(/^```.*\n?/,'').replace(/\n?```$/,''));
+      const r = o.tags||o.tag||o.thought_tags||"";
+      return Array.isArray(r) ? r : r.split(/[,\s]+/).filter(Boolean);
+    } catch { return []; }
+  }
+  const m = text.match(/<tags>([\s\S]*?)<\/tags>/i);
+  return m ? m[1].split(/[,\s]+/).filter(Boolean) : [];
+}
+
+// Build prompt like the real DuckSugar pipeline
+function buildPrompt(rawInput, tc) {
+  const useSketch = $('useSketchToggle').checked;
+  let prompt = `Audio transcrito: "${rawInput}"`;
+
+  if (useSketch && tc && tc.sketch) {
+    const hasCode = tc.sketch.length > 0;
+    const detected = hasCode
+      ? `[CODE DETECTED] The ASR transcript contains code identifiers and/or spoken punctuation.`
+      : `[NO CODE DETECTED] The transcript appears to be conversational.`;
+    const sketchBlock = hasCode
+      ? `[CODE SKETCH] Possible code inferred from speech:\n${tc.sketch}\n[END CODE SKETCH]\nUse this as a starting point, verify and improve the syntax.`
+      : `[CODE SKETCH] No reliable sketch could be inferred.`;
+    const criticalNote = hasCode
+      ? `\n\nCRITICAL: [CODE SKETCH] has content. NEVER leave <code> empty. Return the corrected code.`
+      : `\n\nIf user did not mention code, leave <code> empty.`;
+
+    if (tc.context) {
+      prompt = `Contexto IDE: ${tc.context}\n\n${detected}\n\n${sketchBlock}${criticalNote}\n\nAudio transcrito: "${rawInput}"`;
+    } else {
+      prompt = `${detected}\n\n${sketchBlock}${criticalNote}\n\nAudio transcrito: "${rawInput}"`;
+    }
+  } else if (tc && tc.context) {
+    prompt = `Contexto IDE: ${tc.context}\n\nAudio transcrito: "${rawInput}"`;
+  }
+
+  return prompt;
+}
+
+// Run single format
+async function runOne(type, rawInput, tc, retries = 0) {
+  const sys = getPrompt(type);
+  const opts = { temperature:0.1, topK:10, initialPrompts:[{role:"system",content:sys}] };
+  if (type==='json'||type==='hybrid') {
+    opts.responseConstraint = {
+      type:"object",
+      required:["think","tags","transcript","code","answer","directed","lang","needs_context"],
+      properties:{
+        think:{type:"string"}, tags:{type:"string"}, transcript:{type:"string"},
+        code:{type:"string"}, answer:{type:"string"}, directed:{type:"boolean"},
+        lang:{type:"string"}, needs_context:{type:"boolean"}
       },
-      xml: {
-        system: `You are a technical coding assistant. Return ONLY the content enclosed in XML tags.
-Do not write markdown backticks or prose.
-Use exactly this structure:
-<think>analyze phonetic corrections or ambiguity before writing code</think>
-<transcript>literal transcript of audio</transcript>
-<code>isolated programming statement</code>`,
-        user: `Dictado de voz del usuario: "crear una variable llamada contador igual a 0 punto y coma"`
-      },
-      hybrid: {
-        system: `You are a technical coding assistant. Return ONLY valid JSON.
-Use exactly this shape: {"think":"","payload":""}
-Keep fields in this order: think, payload.
-think: analyze phonetic corrections or ambiguity before writing code.
-payload: Return XML-like tags containing transcript and code, like this:
-<t>literal transcript</t><c>isolated code</c>
-Never escape quotes inside the XML payload.`,
-        user: `Dictado de voz del usuario: "crear una variable llamada contador igual a 0 punto y coma"`
-      }
+      additionalProperties:false
     };
+  }
+  const session = await aiApi.create(opts);
+  const userPrompt = buildPrompt(rawInput, tc);
+  const finalPrompt = type==='xml-prefix'
+    ? [{role:"user",content:userPrompt}, {role:"assistant",content:"<response>\n  <think>",prefix:true}]
+    : userPrompt;
 
-    let shouldStopSuite = false;
+  const t0 = performance.now();
+  let first = null, text = "";
+  const stream = session.promptStreaming(finalPrompt);
+  for await (const chunk of stream) {
+    if (shouldStop) { session.destroy(); throw new Error("stop"); }
+    if (performance.now()-t0 > 15000) { session.destroy(); throw new Error("timeout"); }
+    if (!first) first = performance.now();
+    const s = String(chunk);
+    text = s.startsWith(text) ? s : text + s;
+  }
+  const total = performance.now()-t0;
+  session.destroy();
+  const ttft = first ? first-t0 : 0;
+  const active = Math.max(1, total-ttft);
+  const tps = parseFloat(((text.length/4)/(active/1000)).toFixed(1));
 
-    // Update fields based on selected format
-    expType.addEventListener('change', () => {
-      const type = expType.value;
-      systemPrompt.value = PROMPTS[type].system;
-      userPrompt.value = PROMPTS[type].user;
-    });
+  // Retry on empty/garbage output for JSON formats (1 retry max)
+  if (retries < 1 && (type==='json'||type==='hybrid')) {
+    const clean = text.replace(/^```.*\n?/,'').replace(/\n?```$/,'').trim();
+    const needsRetry = !clean || (() => { try { JSON.parse(clean); return false; } catch { return true; } })();
+    if (needsRetry) {
+      await new Promise(r=>setTimeout(r,200));
+      const retryResult = await runOne(type, rawInput, tc, retries + 1);
+      retryResult.retried = true;
+      return retryResult;
+    }
+  }
 
-    // Set initial values
-    systemPrompt.value = PROMPTS.json.system;
-    userPrompt.value = PROMPTS.json.user;
+  const code = extractCode(text, type, rawInput||'');
+  const fallbackCode = tc?.sketch && tc?.expectHasCode && !code ? tc.sketch : undefined;
+  const code_origin = code ? 'model' : (fallbackCode ? 'speech_normalizer' : 'none');
 
-    let aiApi = null;
+  const bugs = detectBugs(text, type, tc);
 
-    checkBtn.addEventListener('click', async () => {
-      try {
-        availStatus.textContent = "Comprobando...";
-        if (!("LanguageModel" in window) && !(window.ai?.languageModel)) {
-          availStatus.innerHTML = "<span style='color: #ef4444;'>❌ LanguageModel API no está disponible en este navegador.</span> Asegúrate de usar Chrome v131+ y activar los flags en chrome://flags.";
-          return;
-        }
+  return {
+    format:type, ttft:Math.round(ttft), total:Math.round(total), tps, text, bugs,
+    code, fallbackCode, code_origin, retried:retries>0
+  };
+}
 
-        const modelApi = window.LanguageModel || window.ai.languageModel;
-        const availability = await modelApi.availability();
-        availStatus.innerHTML = `Model availability: <strong>${availability}</strong>`;
-        
-        if (availability === "available" || availability === "downloadable") {
-          runBtn.disabled = false;
-          runCompareBtn.disabled = false;
-          runSuiteBtn.disabled = false;
-          aiApi = modelApi;
-          availStatus.innerHTML += " <span style='color: #22c55e;'>(¡Listo para ejecutar!)</span>";
-        } else {
-          availStatus.innerHTML += " <span style='color: #eab308;'>(El modelo no se puede usar todavía)</span>";
-        }
-      } catch (err) {
-        availStatus.innerHTML = `<span style='color: #ef4444;'>Error: ${err.message}</span>`;
-      }
-    });
+// Check API
+$('checkBtn').onclick = async () => {
+  $('availStatus').textContent = "Comprobando...";
+  try {
+    if (!("LanguageModel" in window)) { $('availStatus').innerHTML = "<span style='color:#ef4444;'>No disponible</span>"; return; }
+    const s = await LanguageModel.availability();
+    $('availStatus').innerHTML = `Estado: <strong>${s}</strong>`;
+    if (s==="available"||s==="downloadable") {
+      aiApi = LanguageModel;
+      ['runBtn','runAllBtn','runSuiteBtn'].forEach(id => $(id).disabled = false);
+      $('availStatus').innerHTML += " <span style='color:#22c55e;'>Listo!</span>";
+    }
+  } catch(e) { $('availStatus').innerHTML = `<span style='color:#ef4444;'>${e.message}</span>`; }
+};
 
-    // Smart streaming helper that accumulates correctly and protects timeouts
-    async function runSingleFormat(type, sysContent, userContent) {
-      outputArea.textContent = `[${type.toUpperCase()}] Inicializando sesión...`;
-      
-      const sessionOptions = {
-        temperature: 0.3,
-        topK: 3,
-        initialPrompts: [
-          { role: "system", content: sysContent }
-        ]
-      };
+function showResult(r) {
+  $('outputArea').textContent = r.text || "(sin salida)";
+  $('metricTime').textContent = `${r.total}ms TTFT:${r.ttft}ms ${r.tps}t/s`;
+  $('bugOutput').innerHTML = r.bugs.length
+    ? r.bugs.map(b => `<span class="badge ${b.sev}">${b.id}</span> ${b.label}`).join('<br>')
+    : " Sin bugs";
+}
 
-      if (type === 'json') {
-        sessionOptions.responseConstraint = {
-          type: "object",
-          required: ["think", "transcript", "code"],
-          properties: {
-            think: { type: "string" },
-            transcript: { type: "string" },
-            code: { type: "string" }
-          }
-        };
-      } else if (type === 'hybrid') {
-        sessionOptions.responseConstraint = {
-          type: "object",
-          required: ["think", "payload"],
-          properties: {
-            think: { type: "string" },
-            payload: { type: "string" }
-          }
-        };
-      }
+// Single run
+$('runBtn').onclick = async () => {
+  if (!aiApi) return;
+  $('runBtn').disabled = true;
+  try {
+    const r = await runOne($('expType').value, $('userPrompt').value, null);
+    showResult(r);
+  } catch(e) { $('outputArea').textContent = `Error: ${e.message}`; }
+  finally { $('runBtn').disabled = false; }
+};
 
-      const session = await aiApi.create(sessionOptions);
-      outputArea.textContent = `[${type.toUpperCase()}] Conectado...`;
+// All formats
+$('runAllBtn').onclick = async () => {
+  if (!aiApi) return;
+  $('runAllBtn').disabled = true;
+  const fmts = ['json','xml','hybrid'];
+  const rows = [];
+  for (const fmt of fmts) {
+    try {
+      const r = await runOne(fmt, $('userPrompt').value, null);
+      rows.push(r);
+      showResult(r);
+      await new Promise(r=>setTimeout(r,400));
+    } catch(e) { rows.push({format:fmt,total:0,ttft:0,tps:0,text:`Error: ${e.message}`,bugs:[{id:"ERROR",sev:"fail",label:e.message}]}); }
+  }
+  $('runAllBtn').disabled = false;
+};
 
-      const startTime = performance.now();
-      let firstTokenTime = null;
-      let responseText = "";
+// Suite
+async function runSuite() {
+  if (!aiApi) return;
+  shouldStop = false;
+  allSuiteResults = [];
+  $('runSuiteBtn').disabled = true;
+  $('stopSuiteBtn').disabled = false;
+  $('suiteBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--accent);">Ejecutando...</td></tr>';
+  $('bugBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--accent);">(corriendo...)</td></tr>';
 
-      const stream = session.promptStreaming(userContent);
-      
-      for await (const chunk of stream) {
-        if (shouldStopSuite) {
-          session.destroy();
-          throw new Error("Abortado por el usuario");
-        }
-        if (performance.now() - startTime > 12000) { // 12 seconds protection limit
-          session.destroy();
-          throw new Error("Límite de tiempo excedido (12s) - Posible bucle cognitivo");
-        }
-        if (!firstTokenTime) {
-          firstTokenTime = performance.now();
-        }
-        const chunkStr = String(chunk);
-        // Smart accumulation: if cumulative, use chunkStr. Otherwise append.
-        responseText = chunkStr.startsWith(responseText) ? chunkStr : responseText + chunkStr;
-        outputArea.textContent = responseText;
-      }
-
-      const endTime = performance.now();
-      const totalDuration = endTime - startTime;
-      const firstTokenDuration = firstTokenTime ? (firstTokenTime - startTime) : 0;
-      const activeDurationMs = Math.max(1, totalDuration - firstTokenDuration);
-      
-      const charCount = responseText.length;
-      const estTokens = charCount / 4;
-      const tokensPerSec = estTokens / (activeDurationMs / 1000);
-
-      let parseOk = false;
-      let parseStatus = "No";
-      if (type === 'json' || type === 'hybrid') {
-        let cleanText = responseText.trim();
-        if (cleanText.startsWith("```")) {
-          cleanText = cleanText.replace(/^```[a-zA-Z]*\s*/, "");
-          cleanText = cleanText.replace(/\s*```$/, "");
-        }
+  try {
+    for (const tc of CASES) {
+      for (const fmt of suiteFormats) {
+        if (shouldStop) throw new Error("Cancelado");
+        $('suiteStatus').textContent = `${tc.id} ${tc.desc} — ${fmt.toUpperCase()}`;
         try {
-          JSON.parse(cleanText);
-          parseOk = true;
-          parseStatus = "✅ JSON Válido";
-        } catch {
-          parseStatus = "❌ JSON Roto";
+          const r = await runOne(fmt, tc.input, tc);
+          r.caseId = tc.id; r.desc = tc.desc;
+          allSuiteResults.push(r);
+          showResult(r);
+        } catch(e) {
+          const errResult = {format:fmt,caseId:tc.id,desc:tc.desc,ttft:0,total:0,tps:0,text:"",bugs:[{id:e.message.includes("timeout")?"TIMEOUT":"ERROR",sev:"fail",label:e.message}],code:"",fallbackCode:tc?.sketch||"",code_origin:"error"};
+          allSuiteResults.push(errResult);
+          $('outputArea').textContent = `[${fmt}] ${tc.id}: Error - ${e.message}`;
         }
-      } else {
-        const hasThink = responseText.includes('<think>') && responseText.includes('</think>');
-        const hasTrans = responseText.includes('<transcript>') && responseText.includes('</transcript>');
-        const hasCode = responseText.includes('<code>') && responseText.includes('</code>');
-        parseOk = (hasThink && hasTrans && hasCode);
-        parseStatus = parseOk ? "✅ XML Válido" : "❌ XML Roto";
+        // Update tables and log in real-time after each test
+        renderSuite(allSuiteResults);
+        await new Promise(r=>setTimeout(r,300));
       }
-
-      // Update UI metric cards dynamically in real-time
-      metricTime.textContent = `${Math.round(totalDuration)} ms`;
-      metricFirstToken.textContent = `${Math.round(firstTokenDuration)} ms`;
-      metricSpeed.textContent = `${tokensPerSec.toFixed(1)} t/s (est)`;
-      metricParse.textContent = parseStatus;
-
-      session.destroy();
-
-      return {
-        format: type,
-        firstTokenMs: Math.round(firstTokenDuration),
-        activeMs: Math.round(activeDurationMs),
-        totalMs: Math.round(totalDuration),
-        tokensPerSec: parseFloat(tokensPerSec.toFixed(1)),
-        charCount,
-        parseOk,
-        parseStatus,
-        text: responseText
-      };
     }
-
-    runBtn.addEventListener('click', async () => {
-      if (!aiApi) return;
-      runBtn.disabled = true;
-      runCompareBtn.disabled = true;
-      runSuiteBtn.disabled = true;
-      
-      metricTime.textContent = "-";
-      metricFirstToken.textContent = "-";
-      metricSpeed.textContent = "-";
-      metricParse.textContent = "-";
-
-      const type = expType.value;
-      const sysContent = systemPrompt.value;
-      const userContent = userPrompt.value;
-
-      try {
-        await runSingleFormat(type, sysContent, userContent);
-      } catch (err) {
-        outputArea.textContent = `Error durante ejecución: ${err.message}`;
-      } finally {
-        runBtn.disabled = false;
-        runCompareBtn.disabled = false;
-        runSuiteBtn.disabled = false;
-      }
+    const log = renderSuite(allSuiteResults);
+    saveHistory({
+      label: new Date().toLocaleTimeString(),
+      timestamp: new Date().toISOString(),
+      chrome: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1]||"unknown",
+      summary: log?.summary || {},
+      bugs: log?.bugs || {},
+      winner: log?.winner
     });
-
-    runCompareBtn.addEventListener('click', async () => {
-      if (!aiApi) return;
-      runBtn.disabled = true;
-      runCompareBtn.disabled = true;
-      runSuiteBtn.disabled = true;
-      compareBody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--accent);">Ejecutando comparativa... Por favor espera.</td></tr>`;
-      logSummary.value = "";
-      copyLogBtn.style.display = "none";
-
-      const results = [];
-      const formats = ['json', 'xml', 'hybrid'];
-
-      try {
-        for (const fmt of formats) {
-          const sysContent = PROMPTS[fmt].system;
-          const userContent = PROMPTS[fmt].user;
-          
-          const result = await runSingleFormat(fmt, sysContent, userContent);
-          results.push(result);
-          
-          await new Promise(r => setTimeout(r, 600)); // Cool down
-        }
-
-        renderTable(results);
-
-        const summaryData = {
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          chromeVersion: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1] || "unknown",
-          benchmarks: results.map(r => ({
-            format: r.format,
-            ttft_ms: r.firstTokenMs,
-            generation_ms: r.activeMs,
-            total_ms: r.totalMs,
-            tokens_per_sec: r.tokensPerSec,
-            chars: r.charCount,
-            parse_ok: r.parseOk,
-            response_sample: r.text.slice(0, 150) + (r.text.length > 150 ? "..." : "")
-          }))
-        };
-
-        logSummary.value = JSON.stringify(summaryData, null, 2);
-        localStorage.setItem('duck_sugar_benchmarks_xml', JSON.stringify(summaryData));
-        copyLogBtn.style.display = "inline-block";
-
-      } catch (err) {
-        compareBody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: #ef4444;">Error en comparativa: ${err.message}</td></tr>`;
-      } finally {
-        runBtn.disabled = false;
-        runCompareBtn.disabled = false;
-        runSuiteBtn.disabled = false;
-      }
-    });
-
-    function renderTable(results) {
-      compareBody.innerHTML = "";
-      results.forEach(res => {
-        let rowColor = "";
-        if (res.format === 'json') rowColor = "color: #38bdf8;";
-        else if (res.format === 'xml') rowColor = "color: #f59e0b;";
-        else if (res.format === 'hybrid') rowColor = "color: #10b981;";
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td style="padding: 10px 12px; font-weight: bold; ${rowColor}">${res.format.toUpperCase()}</td>
-          <td style="padding: 10px 12px;">${res.firstTokenMs} ms</td>
-          <td style="padding: 10px 12px;">${res.activeMs} ms</td>
-          <td style="padding: 10px 12px;">${res.totalMs} ms</td>
-          <td style="padding: 10px 12px; font-weight: bold;">${res.tokensPerSec} t/s</td>
-          <td style="padding: 10px 12px;">${res.charCount}</td>
-          <td style="padding: 10px 12px;">${res.parseStatus}</td>
-        `;
-        compareBody.appendChild(tr);
-      });
-    }
-
-    copyLogBtn.addEventListener('click', () => {
-      logSummary.select();
-      document.execCommand('copy');
-      const originalText = copyLogBtn.textContent;
-      copyLogBtn.textContent = "✅ ¡Copiado!";
-      setTimeout(() => {
-        copyLogBtn.textContent = originalText;
-      }, 2000);
-    });
-
-    // SUITE MASIVA RUNNER & STATS
-    stopSuiteBtn.addEventListener('click', () => {
-      shouldStopSuite = true;
-      stopSuiteBtn.disabled = true;
-      suiteStatus.textContent = "Cancelando suite en la próxima corrida...";
-    });
-
-    runSuiteBtn.addEventListener('click', async () => {
-      if (!aiApi) return;
-      shouldStopSuite = false;
-      
-      runBtn.disabled = true;
-      runCompareBtn.disabled = true;
-      runSuiteBtn.disabled = true;
-      stopSuiteBtn.disabled = false;
-      
-      suiteSummaryBody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: var(--accent);">Inicializando suite masiva...</td></tr>`;
-      suiteLogSummary.value = "";
-      copySuiteLogBtn.style.display = "none";
-
-      const suiteRuns = [];
-      const formats = ['json', 'xml', 'hybrid'];
-      const totalSteps = TEST_CASES.length * formats.length;
-      let currentStep = 0;
-
-      try {
-        for (let i = 0; i < TEST_CASES.length; i++) {
-          const testCase = TEST_CASES[i];
-          
-          for (const fmt of formats) {
-            if (shouldStopSuite) {
-              throw new Error("Ejecución cancelada voluntariamente.");
-            }
-            
-            currentStep++;
-            suiteStatus.innerHTML = `Ejecutando: <strong>Caso ${i + 1}/15 (${testCase.difficulty})</strong> - Formato: <strong style="color: var(--accent);">${fmt.toUpperCase()}</strong> [Paso ${currentStep}/${totalSteps}]`;
-            
-            const sysContent = PROMPTS[fmt].system;
-            const userContent = `Contexto IDE: { "activeFile": "app.js", "noteActiveId": "note-1", "notesFiltradas": [], "noteList": {}, "noteCount": {} }\n` +
-                                `Audio transcrito: "${testCase.user}"`;
-
-            let runResult;
-            try {
-              runResult = await runSingleFormat(fmt, sysContent, userContent);
-              runResult.caseId = testCase.id;
-              runResult.difficulty = testCase.difficulty;
-              runResult.timeout = false;
-            } catch (err) {
-              console.error(`Error en caso ${testCase.id} [${fmt}]:`, err);
-              runResult = {
-                format: fmt,
-                caseId: testCase.id,
-                difficulty: testCase.difficulty,
-                firstTokenMs: 0,
-                activeMs: 0,
-                totalMs: 0,
-                tokensPerSec: 0,
-                charCount: 0,
-                parseOk: false,
-                parseStatus: err.message.includes("Límite de tiempo") ? "❌ Timeout (12s)" : "❌ Error",
-                timeout: true,
-                text: ""
-              };
-            }
-            
-            suiteRuns.push(runResult);
-            await new Promise(r => setTimeout(r, 500)); // Cool down
-          }
-        }
-
-        suiteStatus.textContent = "✅ ¡Suite Masiva completada con éxito!";
-        renderSuiteSummary(suiteRuns);
-
-      } catch (err) {
-        suiteStatus.textContent = `❌ Interrumpido: ${err.message}`;
-      } finally {
-        runBtn.disabled = false;
-        runCompareBtn.disabled = false;
-        runSuiteBtn.disabled = false;
-        stopSuiteBtn.disabled = true;
-      }
-    });
-
-    function renderSuiteSummary(runs) {
-      const formats = ['json', 'xml', 'hybrid'];
-      const stats = {};
-
-      formats.forEach(fmt => {
-        const fmtRuns = runs.filter(r => r.format === fmt);
-        const validRuns = fmtRuns.filter(r => !r.timeout);
-        const parsedRuns = fmtRuns.filter(r => r.parseOk);
-        const timeoutRuns = fmtRuns.filter(r => r.timeout);
-
-        const avgTtft = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.firstTokenMs, 0) / validRuns.length : 0;
-        const avgActive = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.activeMs, 0) / validRuns.length : 0;
-        const avgTotal = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.totalMs, 0) / validRuns.length : 0;
-        const avgSpeed = validRuns.length > 0 ? validRuns.reduce((acc, r) => acc + r.tokensPerSec, 0) / validRuns.length : 0;
-
-        stats[fmt] = {
-          avgTtft: Math.round(avgTtft),
-          avgActive: Math.round(avgActive),
-          avgTotal: Math.round(avgTotal),
-          avgSpeed: parseFloat(avgSpeed.toFixed(1)),
-          parseRate: parseFloat(((parsedRuns.length / fmtRuns.length) * 100).toFixed(1)),
-          failures: timeoutRuns.length
-        };
-      });
-
-      suiteSummaryBody.innerHTML = "";
-      formats.forEach(fmt => {
-        const res = stats[fmt];
-        let rowColor = "";
-        if (fmt === 'json') rowColor = "color: #38bdf8;";
-        else if (fmt === 'xml') rowColor = "color: #f59e0b;";
-        else if (fmt === 'hybrid') rowColor = "color: #10b981;";
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td style="padding: 10px 12px; font-weight: bold; ${rowColor}">${fmt.toUpperCase()}</td>
-          <td style="padding: 10px 12px;">${res.avgTtft} ms</td>
-          <td style="padding: 10px 12px;">${res.avgActive} ms</td>
-          <td style="padding: 10px 12px;">${res.avgTotal} ms</td>
-          <td style="padding: 10px 12px; font-weight: bold;">${res.avgSpeed} t/s</td>
-          <td style="padding: 10px 12px; font-weight: bold; color: ${res.parseRate >= 90 ? 'var(--highlight)' : 'var(--warning)'};">${res.parseRate}%</td>
-          <td style="padding: 10px 12px; color: ${res.failures > 0 ? '#ef4444' : 'var(--text)'};">${res.failures}</td>
-        `;
-        suiteSummaryBody.appendChild(tr);
-      });
-
-      const suitePayload = {
+    $('suiteStatus').textContent = " Suite completada!";
+  } catch(e) {
+    $('suiteStatus').textContent = ` ${e.message}`;
+    if (allSuiteResults.length) {
+      const log = renderSuite(allSuiteResults);
+      saveHistory({
+        label: `${new Date().toLocaleTimeString()} (cancelada)`,
         timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        chromeVersion: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1] || "unknown",
-        summary: stats,
-        runs: runs.map(r => ({
-          format: r.format,
-          caseId: r.caseId,
-          difficulty: r.difficulty,
-          ttft_ms: r.firstTokenMs,
-          generation_ms: r.activeMs,
-          total_ms: r.totalMs,
-          tokens_per_sec: r.tokensPerSec,
-          chars: r.charCount,
-          parse_ok: r.parseOk,
-          parseStatus: r.parseStatus,
-          text_sample: r.text.slice(0, 150) + (r.text.length > 150 ? "..." : "")
-        }))
-      };
-
-      suiteLogSummary.value = JSON.stringify(suitePayload, null, 2);
-      localStorage.setItem('duck_sugar_bulk_benchmarks', JSON.stringify(suitePayload));
-      copySuiteLogBtn.style.display = "inline-block";
+        chrome: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1]||"unknown",
+        summary: log?.summary || {},
+        bugs: log?.bugs || {},
+        winner: log?.winner
+      });
     }
+  } finally {
+    $('runSuiteBtn').disabled = false;
+    $('stopSuiteBtn').disabled = true;
+  }
+}
 
-    copySuiteLogBtn.addEventListener('click', () => {
-      suiteLogSummary.select();
-      document.execCommand('copy');
-      const originalText = copySuiteLogBtn.textContent;
-      copySuiteLogBtn.textContent = "✅ ¡Copiado!";
-      setTimeout(() => {
-        copySuiteLogBtn.textContent = originalText;
-      }, 2000);
-    });
+$('runSuiteBtn').onclick = runSuite;
+$('stopSuiteBtn').onclick = () => { shouldStop = true; $('stopSuiteBtn').disabled = true; $('suiteStatus').textContent = "Cancelando..."; };
 
-    // Restore benchmarks on load
-    window.addEventListener('DOMContentLoaded', () => {
-      const past = localStorage.getItem('duck_sugar_benchmarks_xml');
-      if (past) {
-        try {
-          const data = JSON.parse(past);
-          logSummary.value = JSON.stringify(data, null, 2);
-          copyLogBtn.style.display = "inline-block";
-          
-          const formattedList = data.benchmarks.map(b => ({
-            format: b.format,
-            firstTokenMs: b.ttft_ms,
-            activeMs: b.generation_ms,
-            totalMs: b.total_ms,
-            tokensPerSec: b.tokens_per_sec,
-            charCount: b.chars,
-            parseStatus: b.parse_ok ? "✅ Sí" : "❌ No"
-          }));
-          renderTable(formattedList);
-        } catch (e) {
-          console.error("Error restoring benchmark metrics:", e);
-        }
-      }
+function renderSuite(runs) {
+  const fmts = suiteFormats;
+  const stats = {};
+  const bugMap = { json:{}, xml:{}, hybrid:{} };
+  const BUG_IDS = ['PREFIJO_>','VAR_A_%s','LET_OMIT','XML_ROTO','CODE_VACIO','CHARLA_CODE'];
 
-      // Restore past suite benchmarks on load
-      const pastSuite = localStorage.getItem('duck_sugar_bulk_benchmarks');
-      if (pastSuite) {
-        try {
-          const data = JSON.parse(pastSuite);
-          suiteLogSummary.value = JSON.stringify(data, null, 2);
-          copySuiteLogBtn.style.display = "inline-block";
-          
-          suiteSummaryBody.innerHTML = "";
-          const formats = ['json', 'xml', 'hybrid'];
-          formats.forEach(fmt => {
-            const res = data.summary[fmt];
-            let rowColor = "";
-            if (fmt === 'json') rowColor = "color: #38bdf8;";
-            else if (fmt === 'xml') rowColor = "color: #f59e0b;";
-            else if (fmt === 'hybrid') rowColor = "color: #10b981;";
+  fmts.forEach(f => {
+    const rr = runs.filter(r => r.format===f);
+    const ok = rr.filter(r => !r.bugs.some(b=>b.id==='TIMEOUT'));
+    const parsed = rr.filter(r => r.code || r.bugs.some(b=>b.id==='TIMEOUT'));
+    const timeouts = rr.filter(r => r.bugs.some(b=>b.id==='TIMEOUT'));
+    const bugCount = rr.flatMap(r=>r.bugs).filter(b=>b.sev==='fail').length;
+    const avgTTFT = ok.length ? Math.round(ok.reduce((a,r)=>a+r.ttft,0)/ok.length) : 0;
+    const avgTotal = ok.length ? Math.round(ok.reduce((a,r)=>a+r.total,0)/ok.length) : 0;
+    const avgTPS = ok.length ? parseFloat((ok.reduce((a,r)=>a+r.tps,0)/ok.length).toFixed(1)) : 0;
+    const fallbacks = rr.filter(r => r.code_origin==='speech_normalizer').length;
+    stats[f] = { avgTTFT, avgTotal, avgTPS, parseRate:parseFloat(((parsed.length/rr.length)*100).toFixed(1)), timeouts:timeouts.length, bugCount, fallbacks, totalCases:rr.length };
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td style="padding: 10px 12px; font-weight: bold; ${rowColor}">${fmt.toUpperCase()}</td>
-              <td style="padding: 10px 12px;">${res.avgTtft} ms</td>
-              <td style="padding: 10px 12px;">${res.avgActive} ms</td>
-              <td style="padding: 10px 12px;">${res.avgTotal} ms</td>
-              <td style="padding: 10px 12px; font-weight: bold;">${res.avgSpeed} t/s</td>
-              <td style="padding: 10px 12px; font-weight: bold; color: ${res.parseRate >= 90 ? 'var(--highlight)' : 'var(--warning)'};">${res.parseRate}%</td>
-              <td style="padding: 10px 12px; color: ${res.failures > 0 ? '#ef4444' : 'var(--text)'};">${res.failures}</td>
-            `;
-            suiteSummaryBody.appendChild(tr);
-          });
-        } catch (e) {
-          console.error("Error restoring bulk benchmark metrics:", e);
-        }
-      }
-    });
-  </script>
+    // Count bugs per type
+    for (const bid of BUG_IDS) {
+      bugMap[f][bid] = rr.flatMap(r=>r.bugs).filter(b=>b.id===bid).length;
+    }
+  });
+
+  // Summary table
+  $('suiteBody').innerHTML = fmts.map(f => {
+    const s = stats[f];
+    const color = f==='json'?'#38bdf8':f==='xml'?'#f59e0b':'#10b981';
+    const fallbackPct = s.fallbacks && s.totalCases ? ((s.fallbacks/s.totalCases)*100).toFixed(0) : '0';
+    return `<tr>
+      <td style="font-weight:bold;color:${color}">${f.toUpperCase()}</td>
+      <td>${s.avgTTFT}</td><td>${s.avgTotal}</td><td style="font-weight:bold">${s.avgTPS}</td>
+      <td style="color:${s.parseRate>=80?'#10b981':'#f59e0b'}">${s.parseRate}%</td>
+      <td style="color:${s.timeouts?'#ef4444':'#6b7280'}">${s.timeouts}</td>
+      <td style="font-weight:bold;color:${s.bugCount?'#ef4444':'#10b981'}">${s.bugCount}</td>
+      <td style="color:${s.fallbacks?'#f59e0b':'#6b7280'}">${s.fallbacks||0}</td>
+    </tr>`;
+  }).join('');
+
+  // Bug detail table (dynamic columns)
+  let hasBugs = false;
+  $('bugBody').innerHTML = BUG_IDS.map(bid => {
+    const counts = fmts.map(f => bugMap[f][bid]||0);
+    if (counts.every(c=>!c)) return '';
+    hasBugs = true;
+    return `<tr><td style="font-weight:bold">${bid}</td>${
+      counts.map((c, i) => `<td style="color:${c?'#ef4444':'#6b7280'}">${c}</td>`).join('')
+    }</tr>`;
+  }).join('');
+  const colSpan = fmts.length + 1;
+  if (!hasBugs) $('bugBody').innerHTML = `<tr><td colspan="${colSpan}" style="color:#10b981;text-align:center;"> Sin bugs detectados!</td></tr>`;
+
+  // Full JSON log
+  const log = {
+    timestamp: new Date().toISOString(),
+    chrome: navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1]||"unknown",
+    winner: fmts.map(f => ({f, s:stats[f], score:stats[f]?.parseRate - stats[f]?.bugCount*10})).sort((a,b)=>b.score - a.score)[0]?.f,
+    summary: stats,
+    bugs: bugMap,
+    runs: runs.map(r => ({
+      fmt: r.format, id: r.caseId||'', desc: r.desc||'', ttft: r.ttft, total: r.total, tps: r.tps,
+      bugs: r.bugs.filter(b=>b.sev==='fail').map(b=>b.id),
+      code: (r.code||'').slice(0,100),
+      code_origin: r.code_origin||'model',
+      fallbackCode: r.fallbackCode ? (r.fallbackCode||'').slice(0,60) : undefined
+    }))
+  };
+  $('logArea').value = JSON.stringify(log, null, 2);
+  return log; // return for history saving
+}
+
+// History
+$('clearHistoryBtn').onclick = () => { if (confirm('Borrar todo el historial de benchmarks?')) clearHistory(); };
+renderHistory();
+
+// Copy
+$('copyBtn').onclick = () => {
+  const ta = $('logArea');
+  ta.select();
+  navigator.clipboard.writeText(ta.value).then(() => {
+    $('copyStatus').textContent = "Copiado!";
+    setTimeout(() => $('copyStatus').textContent = "", 2000);
+  }).catch(() => {
+    document.execCommand('copy');
+    $('copyStatus').textContent = "Copiado!";
+    setTimeout(() => $('copyStatus').textContent = "", 2000);
+  });
+};
+</script>
 </body>
 </html>

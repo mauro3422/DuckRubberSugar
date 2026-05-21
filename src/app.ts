@@ -247,6 +247,7 @@ export class DuckSugarApp {
         this.view.showProgress(index, count, `Benchmark ${index}/${count}`);
         this.store.update({ statusText: `Benchmark ${index}/${count}`, statusKind: "" });
         await this.engine.sendAudio(this.view.input.instruction.value, this.view.toolbar.streamingToggle.checked, () => {}, this.view.toolbar.langSelect.value);
+        if (index % 15 === 0) await this.engine.resetModelSession();
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
       this.store.update({ statusText: `Benchmark x${count} listo`, statusKind: "ready" });
@@ -256,15 +257,20 @@ export class DuckSugarApp {
     }
   }
 
-  private async runFullDataset(): Promise<void> {
+  private async runFullDataset(totalTarget = 30): Promise<void> {
     if (this.store.get().isBenchmarkRunning) return;
     this.store.update({ isBenchmarkRunning: true });
 
-    const totalRuns = DefaultDataset.cases.length * AppConfig.benchmarkRuns;
+    const cases = DefaultDataset.cases;
+    const totalRuns = totalTarget;
+    const runsPerCase = Math.floor(totalTarget / cases.length);
+    const extra = totalTarget - runsPerCase * cases.length;
     let globalIndex = 0;
 
     try {
-      for (const testCase of DefaultDataset.cases) {
+      for (let ci = 0; ci < cases.length; ci++) {
+        const testCase = cases[ci];
+        const count = runsPerCase + (ci < extra ? 1 : 0);
         this.store.update({ statusText: `Cargando ${testCase.fileName}...`, statusKind: "" });
         const res = await fetch(`/pruebas/${testCase.fileName}`);
         if (!res.ok) throw new Error(`Could not fetch ${testCase.fileName}`);
@@ -277,12 +283,12 @@ export class DuckSugarApp {
         this.engine.loadAudioFile(file, this.audioDelegate);
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const count = AppConfig.benchmarkRuns;
         for (let index = 1; index <= count; index += 1) {
           globalIndex += 1;
           this.view.showProgress(globalIndex, totalRuns, `[${testCase.id}] ${index}/${count}`);
           this.store.update({ statusText: `[${testCase.id}] Benchmark ${index}/${count}`, statusKind: "" });
           await this.engine.sendAudio(this.view.input.instruction.value, this.view.toolbar.streamingToggle.checked, () => {}, this.view.toolbar.langSelect.value);
+          if (globalIndex % 15 === 0) await this.engine.resetModelSession();
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
       }

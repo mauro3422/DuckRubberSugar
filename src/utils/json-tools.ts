@@ -12,9 +12,41 @@ import { DialogueAnalyzer } from "./dialogue-analyzer.js";
  */
 export class JsonTools {
   static extractResponse(text: string): ParsedResponse | null {
+    let trimmed = text.trim();
+
+    // Strip markdown JSON code fences (```json ... ```)
+    trimmed = trimmed.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, "$1").trim();
+
+    // Try JSON parse first (JSON+RC format)
+    if (trimmed.startsWith("{")) {
+      try {
+        const json = JSON.parse(trimmed);
+        if (json && typeof json === "object" && ("code" in json || "transcript" in json || "think" in json || "tags" in json)) {
+          const tags = Array.isArray(json.tags) ? json.tags.join(", ") : (typeof json.tags === "string" ? json.tags : "");
+          const parsed: ParsedResponse = {
+            think: typeof json.think === "string" ? json.think : "",
+            thought_tags: tags,
+            transcript: typeof json.transcript === "string" ? json.transcript : "",
+            code: typeof json.code === "string" ? this.applyUniversalSymbolFix(json.code) : "",
+            answer: typeof json.answer === "string" ? json.answer : "",
+            is_directed: json.directed === true || json.directed === "true",
+            lang: typeof json.lang === "string" ? json.lang : "es",
+            needs_context: json.needs_context === true || json.needs_context === "true",
+            phonetic_corrections: Array.isArray(json.phonetic_corrections) ? json.phonetic_corrections.filter((c: unknown) => typeof c === "string") : undefined,
+            confidence: typeof json.confidence === "number" ? json.confidence : undefined,
+            reasoning: typeof json.reasoning === "string" ? json.reasoning : undefined,
+          };
+          return this.enrichParsedResponse(parsed);
+        }
+      } catch {
+        // Not valid JSON — fall through to XML parsing
+      }
+    }
+
+    // Fallback: XML extraction (legacy/repair rounds)
     const extractTag = (tag: string): string => {
       const pattern = new RegExp(`<${tag}>([\\s\\S]*?)(?:</${tag}>|$)`, "i");
-      const m = text.match(pattern);
+      const m = trimmed.match(pattern);
       return m ? m[1].trim() : "";
     };
 
@@ -36,10 +68,11 @@ export class JsonTools {
     const think = extractTag("think");
     const transcript = extractTag("transcript");
     
-    if (!think && !transcript && !text.includes("<response>") && !text.includes("<code>") && !text.includes("<answer>")) {
+    if (!think && !transcript && !trimmed.includes("<response>") && !trimmed.includes("<code>") && !trimmed.includes("<answer>")) {
       return null;
     }
 
+    const rawConfidence = parseFloat(extractTag("confidence"));
     const parsed: ParsedResponse = {
       think,
       thought_tags: extractTag("tags"),
@@ -50,6 +83,8 @@ export class JsonTools {
       lang: extractTag("lang") || "es",
       needs_context: extractTag("needs_context").toLowerCase() === "true" || extractTag("needs_context") === "1",
       phonetic_corrections: extractCorrections(),
+      confidence: isFinite(rawConfidence) ? rawConfidence : undefined,
+      reasoning: extractTag("reasoning") || undefined,
     };
 
     return this.enrichParsedResponse(parsed);
@@ -57,22 +92,35 @@ export class JsonTools {
 
   private static stripXmlFromCode(code: string): string {
     if (!code) return "";
-    
+
+    let cleaned = code;
+
+    // Fix 0: Unescape HTML entities in XML mode (Gemini Nano sometimes escapes & to &amp;)
+    cleaned = cleaned.replace(/&amp;/g, "&");
+
+    // Fix 1: Strip leading '>' prefix (Gemini Nano bug: confunde <code> con HTML blockquote)
+    cleaned = cleaned.replace(/^[>\s]+/, "");
+
+    // Fix 2: Fix malformed XML closing tags like </<code>> → </code>
+    cleaned = cleaned.replace(/<\/\s*<\s*([a-zA-Z_][\w-]*)\s*>/g, "</$1>");
+    cleaned = cleaned.replace(/<\s*>\s*/g, "");
+
     // Regex matches string literals (double quote, single quote, template literal) OR any XML/HTML tag
     const pattern = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|<\/?[a-zA-Z_][\w-]*[^>]*>/g;
-    
-    let cleaned = code.replace(pattern, (match) => {
-      // If the match starts with a quote, it is a string literal, so keep it!
+
+    cleaned = cleaned.replace(pattern, (match) => {
       if (match.startsWith('"') || match.startsWith("'") || match.startsWith('`')) {
         return match;
       }
-      // Otherwise, it is an XML/HTML tag, so strip it!
       return "";
     });
-    
-    // Remove any partial/incomplete tag at the very end of the string (e.g. </note, <note, etc.)
+
+    // Remove any partial/incomplete tag at the very end of the string
     cleaned = cleaned.replace(/\s*<\/?(?:[a-zA-Z_]*)$/g, "");
-    
+
+    // Fix 3: Strip any remaining stray '>' that came from malformed XML
+    cleaned = cleaned.replace(/^[>\s]+/g, "");
+
     return cleaned.trim();
   }
 
@@ -111,6 +159,19 @@ export class JsonTools {
         code_origin: parsed.code_origin ?? "model",
       };
     }
+
+    // Fix common JSON output quirks (missing parens, escaped $, comma before ;)
+    result = {
+      ...result,
+      code: this.applyJsonFormatFixes(result.code ?? ""),
+    };
+
+    // Bug fix: restore $variable when model incorrectly converted to %s
+    // (Gemini Nano over-applies printf formatting knowledge)
+    result = {
+      ...result,
+      code: this.restoreDollarVariables(result.code ?? "", parsed.transcript ?? "", parsed.answer ?? ""),
+    };
 
     // Dialogue Analysis Enrichment
     const analysis = DialogueAnalyzer.analyze(result);
@@ -153,9 +214,49 @@ export class JsonTools {
   }
 
   /**
+   * Apply fixes for common JSON output quirks from Gemini Nano.
+   * These are model-level issues specific to JSON+responseConstraint output.
+   */
+  private static applyJsonFormatFixes(code: string): string {
+    if (!code) return code;
+    return code
+      // Fix 1: Comma before ; or ) or at end: `if (!count),` → `if (!count)`
+      .replace(/,(\s*[;)])/g, '$1')
+      .replace(/,\s*$/, '')
+      // Fix 2: Missing parentheses around string literal in function call: `printf "hola"` → `printf("hola")`
+      .replace(/(\b(?:printf?|console\.log|print|write|writeln|alert|confirm|prompt)\s+)("(?:[^"\\]|\\.)*")/gi, '$1($2)')
+      .replace(/(\b(?:printf?|console\.log|print|write|writeln|alert|confirm|prompt)\s+)('(?:[^'\\]|\\.)*')/gi, '$1($2)')
+      // Fix 3: Unescape dollar sign: `\$var` → `$var` (Gemini Nano escapes $ in JSON strings)
+      .replace(/\\\$/g, '$')
+      // Fix 4: Double dollar: `$$var` → `$var` (model doubles $ thinking it needs escaping)
+      .replace(/\$\$/g, '$');
+  }
+
+  /**
    * Check if the code still contains raw spoken punctuation words (e.g. "parentesis", "comillas").
    * If so, universal symbol fix should be applied.
    */
+  /**
+   * Restore $variable when the model incorrectly converted it to %s or removed the dollar sign.
+   * Example: transcript mentions "dollar name" / "signo pesos variable" but model returned %s.
+   */
+  private static restoreDollarVariables(code: string, transcript: string, answer: string): string {
+    if (!code || code.includes("$")) return code;
+    if (/%s/.test(code) || /%d/.test(code)) {
+      const combined = `${transcript} ${answer}`.toLowerCase();
+      const hasDollarMention = /\b(signo\s+pesos?|dolar|dólar|dollar|signo\s+dolar|pesos)\b/i.test(combined);
+      if (hasDollarMention) {
+        // Replace format specifiers with $ if we can find the variable name in transcript
+        const varMatch = combined.match(/\b(signo\s+pesos?|dolar|dólar|dollar|pesos)\s+([a-zA-Z_]\w*)\b/i);
+        if (varMatch) {
+          return code.replace(/%[sd]/g, `$${varMatch[2]}`);
+        }
+        return code.replace(/%[sd]/g, "$");
+      }
+    }
+    return code;
+  }
+
   private static containsRawPunctuationWords(code: string): boolean {
     return /\b(parentesis?|parenthesis|paren|comillas?|comisa|quotes?|llaves?|braces?|curly\s+braces?|corchetes?|brackets?|punto\s+y\s+coma|semicolon|signo\s+de\s+interrogacion|chaves?|colchetes?|ponto\s+e\s+virgula|igual(es)?|equals?|flecha|arrow)\b/i.test(code);
   }
@@ -246,7 +347,37 @@ export class JsonTools {
       return { ...parsed, thought_tags: this.shortTagsFromText(tags) };
     }
 
+    // Map common LLM-generated non-standard tags to standardized vocabulary
+    const standardized = this.normalizeThoughtTags(tags);
+    if (standardized !== tags) {
+      return { ...parsed, thought_tags: standardized };
+    }
+
     return parsed;
+  }
+
+  private static normalizeThoughtTags(tags: string): string {
+    const tagList = tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+    const mapped = tagList.map((tag) => {
+      // Map conversational/social tags to standard
+      if (/^(saludo|charla|conversacion|bienestar|casual|saludar|conversar|dialogo)$/.test(tag)) return "charla";
+      if (/^(codigo|código|programación|programacion|code|programming)$/.test(tag)) return "code_related";
+      // Map print-related tags
+      if (/^(print|printing|impresión|impresion|imprimir|printf)$/.test(tag)) return "spoken_print_call";
+      // Map condition tags
+      if (/^(condition|condición|condicion|conditional)$/.test(tag)) return "condition";
+      // Map variable tags
+      if (/^(variable|asignación|asignacion|assign|assignment)$/.test(tag)) return "assign_or_compare";
+      // Map function tags
+      if (/^(function|función|funcion|arrow)$/.test(tag)) return "arrow_function";
+      // Map DOM tags
+      if (/^(html|innerhtml|dom|render)$/.test(tag)) return "render_html";
+      // Map filter/map tags
+      if (/^(filter|filtrar|filtro)$/.test(tag)) return "filter";
+      if (/^(map|mapear)$/.test(tag)) return "map";
+      return tag;
+    });
+    return mapped.join(", ");
   }
 
   private static looksLikeTranscriptCopy(tags: string, transcript: string): boolean {
@@ -358,5 +489,60 @@ export class JsonTools {
     }
 
     return found ? result : null;
+  }
+
+  /**
+   * Extract response from the audio transcription pass.
+   * Simple JSON-first extraction WITHOUT enrichParsedResponse (DialogueAnalyzer overwrites fields).
+   */
+  static extractAudioResponse(text: string): { transcript: string; phonetic_corrections?: any[]; confidence?: number; reasoning?: string } | null {
+    let trimmed = text.trim();
+
+    // Strip markdown JSON code fences
+    trimmed = trimmed.replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, "$1").trim();
+
+    // Try JSON parse first
+    if (trimmed.startsWith("{")) {
+      try {
+        const json = JSON.parse(trimmed);
+        if (json && typeof json === "object" && typeof json.transcript === "string") {
+          return {
+            transcript: json.transcript,
+            phonetic_corrections: Array.isArray(json.phonetic_corrections) ? json.phonetic_corrections : undefined,
+            confidence: typeof json.confidence === "number" ? json.confidence : undefined,
+            reasoning: typeof json.reasoning === "string" ? json.reasoning : undefined,
+          };
+        }
+      } catch {
+        // Fall through to XML parsing
+      }
+    }
+
+    // XML fallback
+    const extractTag = (tag: string): string => {
+      const pattern = new RegExp(`<${tag}>([\\s\\S]*?)(?:</${tag}>|$)`, "i");
+      const m = trimmed.match(pattern);
+      return m ? m[1].trim() : "";
+    };
+
+    const transcript = extractTag("transcript");
+    if (!transcript) return null;
+
+    const corrections: string[] = [];
+    const correctionPattern = /<correction>([\s\S]*?)(?:<\/correction>|$)/gi;
+    let match;
+    while ((match = correctionPattern.exec(trimmed)) !== null) {
+      const clean = match[1].replace(/<\/?correction>/g, "").trim();
+      if (clean) corrections.push(clean);
+    }
+
+    const rawConfidence = parseFloat(extractTag("confidence"));
+
+    return {
+      transcript,
+      phonetic_corrections: corrections.length > 0 ? corrections : undefined,
+      confidence: isFinite(rawConfidence) ? rawConfidence : undefined,
+      reasoning: extractTag("reasoning") || undefined,
+    };
   }
 }

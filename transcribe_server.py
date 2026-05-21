@@ -68,8 +68,35 @@ class DuckSugarHandler(http.server.SimpleHTTPRequestHandler):
             recognizer = sr.Recognizer()
             with sr.AudioFile(temp_file_path) as source:
                 audio = recognizer.record(source)
-            transcript = recognizer.recognize_google(audio, language=LANGUAGE)
-            self.send_json(200, {"success": True, "transcript": transcript})
+            
+            import concurrent.futures
+            
+            # Concurrently run es-AR and en-US ASR network calls in parallel threads
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                future_es = executor.submit(recognizer.recognize_google, audio, language="es-AR")
+                future_en = executor.submit(recognizer.recognize_google, audio, language="en-US")
+                
+                try:
+                    transcript_es = future_es.result()
+                except Exception as err:
+                    print(f"[DuckSugar] es-AR transcription failed: {err}", flush=True)
+                    transcript_es = ""
+                
+                try:
+                    transcript_en = future_en.result()
+                except Exception as err:
+                    print(f"[DuckSugar] en-US transcription failed: {err}", flush=True)
+                    transcript_en = ""
+            
+            # Primary transcript defaults to Spanish if available, falling back to English
+            primary_transcript = transcript_es if transcript_es else transcript_en
+            
+            self.send_json(200, {
+                "success": True,
+                "transcript": primary_transcript,
+                "transcript_es": transcript_es,
+                "transcript_en": transcript_en,
+            })
         except Exception as error:
             self.send_json(200, {
                 "success": False,

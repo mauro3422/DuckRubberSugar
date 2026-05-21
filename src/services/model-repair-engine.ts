@@ -69,15 +69,15 @@ export class ModelRepairEngine {
         ? [
             "We detected the following phonetic/syntax mismatches between the ASR transcript and expected code identifiers (correct and reflect these):",
             ...firstPassCorrections.map((c: any) => `- ${c}`),
-            "Fix these variable names and operators in the final XML (<code> and <phonetic_corrections> tags)."
+            "Fix these variable names and operators in the final JSON (\"code\" field)."
           ].join("\n")
         : "";
 
       const extraCodeInstruction = codeDetected
-        ? "CRITICAL: Code patterns were detected in the ASR transcript. You MUST generate <code> with the reconstructed code. Empty <code> is an ERROR. Analyze the transcript and rebuild the correct syntax."
+        ? "CRITICAL: Code patterns were detected in the ASR transcript. You MUST generate the \"code\" field with the reconstructed code. Empty \"code\" is an ERROR. Analyze the transcript and rebuild the correct syntax."
         : "";
 
-      const negativeCodeInstruction = "CRITICAL: The <code> block must contain ONLY pure, raw programming code. Do NOT output XML/HTML tags (such as <correction> or </correction>) inside the <code> block. Never nest <correction> tags.";
+      const negativeCodeInstruction = "CRITICAL: The \"code\" field must contain ONLY pure, raw programming code.";
 
       const retryPrompt = this.withExtraInstruction(prompt, [
         "The previous pass returned empty or low-quality fields.",
@@ -91,7 +91,7 @@ export class ModelRepairEngine {
         "Re-read the ASR transcript carefully. Merge the correct info from the previous draft with the transcript text.",
         "If the ASR transcript mentions elements like parentheses, quotes, colons, braces, etc., translate these operators correctly into the code.",
         "Update the 'phonetic_corrections' list with detected and resolved discrepancies.",
-        "Return ONLY the requested XML inside <response>...</response>. Do not use Markdown code fences. Do not leave transcript empty if the transcript contains speech. Do not copy instructions.",
+        "Return ONLY the requested JSON matching the schema. Do not use Markdown code fences. Do not leave transcript empty if the transcript contains speech. Do not copy instructions.",
       ].filter(Boolean).join("\n"));
 
       const retry = await this.executor.runPrompt(retrySession, retryPrompt, useStreaming, onChunk);
@@ -141,8 +141,8 @@ export class ModelRepairEngine {
       const repairPrompt = [
         ResponseContract,
         "",
-        "The previous pass returned this text without valid XML formatting. Treat it as a candidate transcript if it looks like what the user said.",
-        "Now generate ONLY the requested XML inside <response>...</response>.",
+        "The previous pass returned this text without valid JSON formatting. Treat it as a candidate transcript if it looks like what the user said.",
+        "Now generate ONLY the requested JSON matching the schema.",
         "",
         "Previous pass text:",
         response,
@@ -189,6 +189,37 @@ export class ModelRepairEngine {
     onChunk: (text: string) => void
   ): Promise<{ response: string; parsed: any; attempt: RepairAttempt; elapsedMs: number }> {
     const startedAt = performance.now();
+    const scoreBefore = LanguageModelGuard.parsedContentScore(parsed);
+
+    // Quick pre-check: if code is already clean, skip refinement entirely
+    const code = (parsed?.code ?? "").trim();
+    if (code) {
+      const hasRawPunctuation = /\b(parentesis?|comillas?|comisa|llaves?|corchetes?|punto\s+y\s+coma|igual(?:es)?|flecha|arrow)\b/i.test(code);
+      const hasUnbalancedDelimiters = (code.match(/\(/g) ?? []).length !== (code.match(/\)/g) ?? []).length
+        || (code.match(/\{/g) ?? []).length !== (code.match(/\}/g) ?? []).length;
+      const unbalancedQuotes = (code.match(/"/g) ?? []).length % 2 !== 0
+        || (code.match(/'/g) ?? []).length % 2 !== 0;
+      if (scoreBefore > 200 && !hasRawPunctuation && !hasUnbalancedDelimiters && !unbalancedQuotes) {
+        // Already clean — no refinement needed
+        return {
+          response: JsonTools.serializeToXml(parsed),
+          parsed,
+          attempt: {
+            reason: "self_refinement" as RepairReason,
+            elapsedMs: 0,
+            accepted: true,
+            improved: false,
+            scoreDelta: 0,
+            truncated: false,
+            scoreBefore,
+            scoreAfter: scoreBefore,
+            outputChars: JsonTools.serializeToXml(parsed).length,
+          },
+          elapsedMs: 0,
+        };
+      }
+    }
+
     const refinementSession = typeof baseSession.clone === "function" ? await baseSession.clone() : baseSession;
 
     try {
@@ -215,18 +246,16 @@ export class ModelRepairEngine {
 
       const refinementPrompt = [
         "You are DuckRubber in cognitive self-refinement mode.",
-        "Analyze your previous draft XML and return corrected XML enclosed in <response> with exactly these elements: think, tags, transcript, code, answer, directed, lang, needs_context, phonetic_corrections.",
+        "Analyze your previous draft and return corrected JSON matching the schema.",
         "1. Fix any unclosed quotes, floating double quotes, or broken escape characters inside code.",
         "2. Balance all parentheses, curly braces, and square brackets in code that were left open or dangling.",
         "3. Translate any raw spoken punctuation or phonetic operators in code (e.g. parentesis, comillas, dos puntos, igual igual, llave) into code syntax.",
         correctionsText,
-        "4. Keep tags first, then transcript, code, answer, directed, lang, needs_context, phonetic_corrections.",
-        "5. tags must be at most 8 comma-separated clues; never copy transcript into tags.",
-        "6. In 'phonetic_corrections', list the final resolved or mismatched phonetic corrections inside <correction> tags.",
-        "7. The <code> block must contain ONLY pure, raw programming code. Do NOT output XML/HTML tags (such as <correction> or </correction>) inside the <code> block. Never nest <correction> tags.",
-        "8. Return ONLY the complete, valid XML structure. No markdown backticks, no pre-text, no post-text, and no explanation.",
+        "4. tags must be at most 8 comma-separated clues; never copy transcript into tags.",
+        "5. The 'code' field must contain ONLY pure, raw programming code.",
+        "6. Return ONLY the complete, valid JSON. No markdown backticks, no pre-text, no post-text, and no explanation.",
         "",
-        "Previous draft XML to refine:",
+        "Previous draft to refine:",
         JsonTools.serializeToXml(cleanParsed),
       ].filter(Boolean).join("\n");
 

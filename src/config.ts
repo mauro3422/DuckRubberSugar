@@ -9,46 +9,49 @@ function djb2Hash(str: string): string {
 }
 
 const contractRaw = [
-  "You are DuckRubber, a local technical rubber-duck for spoken Spanish or English.",
-  "You will receive a high-fidelity text transcription of the user's voice along with a metadata header describing their current acoustic/emotional state in the format `[Acoustic State: calm|focus|tired|frustrated]`. Your job is to act as a semantic linter, code helper, and empathetic partner.",
-  "Return ONLY valid XML tags. Do not use markdown fences or prose outside the XML tags.",
-  "Use exactly this structure:",
-  "<response>",
-  "  <think></think>",
-  "  <tags></tags>",
-  "  <transcript></transcript>",
-  "  <code></code>",
-  "  <answer></answer>",
-  "  <directed></directed>",
-  "  <lang></lang>",
-  "  <needs_context></needs_context>",
-  "  <phonetic_corrections>",
-  "  </phonetic_corrections>",
-  "</response>",
+  "You are DuckRubber, a local technical rubber-duck for Spanish or English voice input.",
+  "You receive a transcription AND a [CODE SKETCH] from a local normalizer.",
+  "Your job is to VALIDATE and CORRECT the sketch, not to write it from scratch.",
+  "Return ONLY valid JSON matching this schema:",
+  '{"think":"","tags":"","transcript":"","code":"","answer":"","directed":true,"lang":"es","needs_context":false,"phonetic_corrections":[]}',
+  "Examples:",
+  '- Good: {"code":"printf("total %d", monto);"}',
+  '- Good: {"code":"console.log("$name");"}',
+  '- Bad: {"code":"printf("total "$"monto");"}',
+  '- Bad: {"code":"printf("Hola mundo.");"} when sketch has $variable',
   "",
-  "=== SYSTEM GUIDELINES & DIRECTIVES FOR XML FIELDS ===",
-  "1. <think> tag: CRITICAL — Write your private audit note in ENGLISH ONLY. Max 12 words. No Spanish. No copying transcript. No HTML.",
-  "2. <tags> tag: maximum 8 comma-separated clues only. For general conversation or greetings, include the tag 'charla' or 'saludo'. Never repeat transcript.",
-  "3. <transcript> tag: Save the exact transcript provided in the user's input.",
-  "4. <code> tag: CRITICAL — If the user dictates code or describes code logic, reconstruct the probable code here. Never leave <code> empty when the user mentions code identifiers, operators, or DOM properties. Translate verbal punctuation (e.g., 'parentesis', 'llaves', 'igual igual', 'flecha') into correct syntax. The <code> block must contain ONLY pure, raw code without any XML/HTML tags (like <correction>). Never nest <correction> tags inside <code>. A [CODE SKETCH] hint may be provided — use it as a starting point but verify and improve it. If you see [CODE DETECTED] in the input header, code generation is MANDATORY — leaving <code> empty is a FAILURE. When [CODE DETECTED] is present, you MUST analyze the transcript and output the reconstructed code inside <code>.",
-  "5. <answer> tag: CRITICAL — Be EXTREMELY CONCISE. Maximum 20 words. No greetings ('hola', 'como estas'), no encouragement ('tranquilo', 'vamos paso a paso'), no fluff. Just confirm understanding or ask ONE specific question. If uncertain, just list the key identifiers/verbs you detected (e.g. 'Detected: noteList, map, innerHTML, filter'). Never repeat the transcript or code in the answer.",
-  "   - [frustrated]: Be extremely calm, comforting, simple, and direct. Ground the user and offer a soothing, non-technical or very simple reassurance.",
-  "   - [tired]: Be highly encouraging, supportive, patient, and suggest taking a tiny baby-step or a quick breath.",
-  "   - [focus] or [calm]: Be highly professional, direct, and technical, skipping warm-ups and getting straight to the point.",
-  "6. <directed> tag: true when the audio is directed to the assistant, otherwise false.",
-  "7. <lang> tag: es or en.",
-  "8. <needs_context> tag: true when you require more code context from the IDE to understand the exact structure, otherwise false.",
-  "9. <phonetic_corrections> tag: If the user mumbled or said a word that sounds similar to a variable/function in the IDE context (e.g., 'activo' instead of 'activeClass', 'lista' instead of 'noteList', or 'flecha' for '=>'), output these corrections as tags inside <correction> (e.g. <correction>phonetic: activo to activeClass</correction>). If none, leave empty.",
+  "=== RULES ===",
+  "1. think: Internal audit note in ENGLISH. Max 12 words.",
+  "2. tags: Max 8 comma-separated tags. If conversation without code, include 'charla' or 'saludo'.",
+  "3. transcript: The normalizer may have corrected some ASR mishearings. Copy the transcription you receive. If you detect additional ASR errors (technical terms, English words, variable names, punctuation words), note them in phonetic_corrections.",
+  "4. code: You receive a [CODE SKETCH] from the local normalizer. This is your starting point:",
+  "   - Validate and fix syntax errors (unclosed parens, misplaced semicolons).",
+  "   - If the sketch is empty but the transcript clearly mentions code, generate it.",
+  "   - If the user just greets or chats, leave code empty.",
+  "   - Do NOT add code the user did not dictate. Do not turn '$var' into '%s'.",
+  "   - Do NOT use '>' or other prefixes. Clean code only.",
+  "   - The normalizer already translated spoken punctuation into symbols. Do not re-translate.",
+  "   - CRITICAL: If [CODE SKETCH] has content, NEVER leave code empty.",
+   "5. answer: MAX 15 words. Be natural. If the user greets, greet back. If sketch is complete, acknowledge briefly.",
+   "   - If the user said 'hola' before code: respond naturally like '¡Hola! Aquí está: `code`'",
+   "   - If no greeting and sketch is complete: 'Done.' or 'Listo.'",
+   "   - If info is missing: ask ONE specific question.",
+  "   - If chat: respond naturally but briefly.",
+  "6. directed: true if audio is directed at the assistant.",
+  "7. lang: es or en.",
+  "8. needs_context: true if you need more IDE context.",
+   "9. phonetic_corrections: Array of objects describing ASR→audio discrepancies you detected and resolved. Format: {\"original\": \"<ASR word>\", \"corrected\": \"<your word>\", \"confidence\": 0.95}. Example: {\"original\": \"comisa\", \"corrected\": \"comilla\", \"confidence\": 0.95}",
   "",
-  "=== LANGUAGE ENFORCEMENT ===",
-  "IMPORTANT: <think> MUST be in ENGLISH. <answer> must be in the language from [Response Language: ...]. <think> is your internal reasoning — always use English for clarity."
+  "=== KEY REMINDER ===",
+  "The local normalizer already converted speech to a code sketch.",
+  "You only refine. Do not rewrite. Do not over-ask. Do not add code that was not spoken."
 ].join("\n");
 
 export const ResponseContract = contractRaw;
 const contractHash = djb2Hash(contractRaw);
 
 export const AppConfig = {
-  promptVersion: `duck-audio-code-v30-hybrid-schema-${contractHash}`,
+  promptVersion: `duck-audio-code-v35-json-rc-${contractHash}`,
   benchmarkRuns: 10,
   streaming: {
     /** Hard limit: abort stream after this many ms regardless of progress */
@@ -63,8 +66,8 @@ export const AppConfig = {
     codexSummaryHistory: "ducksugarCodexSummaryHistory",
   },
 
-  /** Session mode: 'text' (recommended, faster) or 'audio' (raw audio to model) */
-  sessionMode: "text" as "audio" | "text",
+  /** Session mode: 'audio' — base session supports both text and audio inputs */
+  sessionMode: "audio" as "audio" | "text",
 
   sessionOptions: {
     audio: {
@@ -81,6 +84,59 @@ export const AppConfig = {
   },
 } as const;
 
+export const JsonSchema = {
+  type: "object",
+  required: ["think", "tags", "transcript", "code", "answer", "directed", "lang", "needs_context"],
+  properties: {
+    think: { type: "string" },
+    tags: { type: "string" },
+    transcript: { type: "string" },
+    code: { type: "string" },
+    answer: { type: "string" },
+    directed: { type: "boolean" },
+    lang: { type: "string" },
+    needs_context: { type: "boolean" },
+    phonetic_corrections: { type: "array" },
+    confidence: { type: "number" },
+    reasoning: { type: "string" },
+  },
+  additionalProperties: false,
+} as const;
+
 export const PromptOptionsConfig: PromptOptions = {
-  omitResponseConstraintInput: true,
+  responseConstraint: JsonSchema,
 };
+
+const transcriptionContractRaw = [
+  "You are DuckRubber, listening to an audio recording.",
+  "You receive the raw audio AND the primary ASR transcription below.",
+  "Output your OWN transcription of what you hear in the audio.",
+  "Then note any specific words where you heard something DIFFERENT from the ASR in phonetic_corrections.",
+  "The ASR is the authoritative primary source. Only correct individual words you are very confident about.",
+  "Output valid JSON with 'transcript' (string) and optionally 'phonetic_corrections' (array of objects).",
+  "",
+  "RULES:",
+  "1. think: (optional) Internal note about what you heard.",
+  "2. phonetic_corrections: Array of objects. Each object describes one ASR→audio discrepancy.",
+  "   Format: {\"original\": \"<word in ASR>\", \"corrected\": \"<what you heard>\", \"confidence\": 0.95}",
+  "   original: the word in the ASR transcript that is wrong.",
+  "   corrected: what you actually heard in the audio.",
+  "   confidence: 0-1 how sure you are about this specific correction.",
+  "   Only include words where you are confident the ASR misheard.",
+  "   Include punctuation words (comilla, parentesis, flecha, etc.), technical terms, English words, variable names, numbers, and fast speech artifacts.",
+  "3. Keep the transcript concise. Do not add explanations."
+].join("\n");
+
+export const TranscriptionContract = transcriptionContractRaw;
+
+export const TranscriptionSchema = {
+  type: "object",
+  required: ["transcript"],
+  properties: {
+    think: { type: "string" },
+    transcript: { type: "string" },
+    phonetic_corrections: { type: "array" },
+    confidence: { type: "number" },
+    reasoning: { type: "string" },
+  },
+} as const;

@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DuckSugar Pipeline Test Runner (LLM + Local)</title>
+  <style>
+    :root {
+      --bg: #090d16; --panel: #111827; --text: #f3f4f6;
+      --accent: #38bdf8; --border: #1f2937; --good: #10b981; --bad: #ef4444; --warn: #f59e0b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; padding: 20px; margin: 0; }
+    main { max-width: 1200px; margin: 0 auto; }
+    h1 { color: var(--accent); font-weight: 800; font-size: 1.8rem; margin-top: 0; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    button { background: var(--accent); color: #000; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:hover:not(:disabled) { opacity: 0.9; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: #9ca3af; font-weight: 600; background: #030712; }
+    tr:hover td { background: rgba(56,189,248,0.03); }
+    .pass { color: var(--good); font-weight: bold; }
+    .fail { color: var(--bad); font-weight: bold; }
+    .warn { color: var(--warn); }
+    .code { font-family: 'Fira Code', monospace; font-size: 0.78rem; word-break: break-all; max-width: 280px; display: inline-block; }
+    .tag { background: #1f2937; border-radius: 4px; padding: 1px 6px; font-size: 0.72rem; }
+    .llm-detail { margin-top: 4px; font-size: 0.72rem; }
+    .llm-detail summary { cursor: pointer; color: var(--accent); }
+    .llm-xml pre { background: #030712; padding: 6px; border-radius: 4px; max-height: 180px; overflow: auto; font-size: 0.68rem; white-space: pre-wrap; word-break: break-all; }
+    .llm-fields { background: #030712; padding: 6px; border-radius: 4px; margin-top: 4px; font-size: 0.72rem; line-height: 1.5; }
+    .summary-card { display: inline-block; background: #030712; border: 1px solid var(--border); border-radius: 6px; padding: 12px 20px; margin: 4px; min-width: 120px; }
+    .summary-card div { font-size: 0.78rem; color: #9ca3af; }
+    .summary-card span { font-size: 1.6rem; font-weight: 800; }
+    progress { width: 100%; height: 8px; border-radius: 4px; }
+    progress::-webkit-progress-bar { background: #1f2937; border-radius: 4px; }
+    progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1> DuckSugar Pipeline Test Runner</h1>
+  <p style="color:#9ca3af;">Evalua el reconstructor local + LLM (Chrome Gemini Nano) con transcripciones simuladas.</p>
+
+  <div class="panel" style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+    <div><strong>Estado:</strong> <span id="statusLabel">Esperando</span></div>
+    <div><strong>Modelo:</strong> <span id="modelStatus" class="warn">No verificado</span></div>
+    <button id="runBtn"> Ejecutar 20 Tests con LLM</button>
+    <button id="skipLlmBtn" style="background:var(--warn);"> Solo Local (sin LLM)</button>
+    <button id="copyBtn" style="background:#374151;color:#f3f4f6;" disabled> Copiar Resultados</button>
+    <button id="exportBtn" style="background:#374151;color:#f3f4f6;" disabled> Exportar JSON</button>
+  </div>
+
+  <div id="llmInfo" class="panel" style="display:none;padding:10px;font-size:0.85rem;">
+    <span id="llmStatusText">Inicializando...</span>
+    <span id="llmErrorDetail" style="display:block;color:var(--warn);margin-top:4px;"></span>
+  </div>
+
+  <div id="progressWrap" style="display:none; margin-bottom:12px;">
+    <progress id="progressBar" value="0" max="20"></progress>
+    <div style="display:flex; justify-content:space-between; font-size:0.78rem; color:#9ca3af; margin-top:4px;">
+      <span id="progressLabel">0/20</span>
+      <span id="progressTime">0s</span>
+    </div>
+  </div>
+
+  <div id="summary" style="display:none; margin-bottom:16px;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <div class="summary-card"><div>Pasaron</div><span id="sumPass" class="pass">0</span></div>
+      <div class="summary-card"><div>Fallaron</div><span id="sumFail" class="fail">0</span></div>
+      <div class="summary-card"><div>Tiempo Total</div><span id="sumTime">0s</span></div>
+      <div class="summary-card"><div>Local OK</div><span id="sumLocalOk" class="pass">0</span></div>
+      <div class="summary-card"><div>LLM OK</div><span id="sumLlmOk" class="pass">0</span></div>
+      <div class="summary-card"><div>Con codigo LLM</div><span id="sumLlmCode" style="font-size:1.6rem;font-weight:800;">0</span></div>
+    </div>
+    <div id="llmTagSummary" style="margin-top:8px;font-size:0.78rem;color:#9ca3af;"></div>
+  </div>
+
+  <div class="panel" style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Descripcion</th><th>Local Code</th><th>Tags</th><th>LLM Response</th>
+          <th>Local OK</th><th>LLM OK</th><th>ms</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+// ===== INLINED UniversalGrammar =====
+const UniversalToken = {};
+Object.assign(UniversalToken, {
+  ASSIGN: "ASSIGN", EQUALITY: "EQUALITY", LAMBDA: "LAMBDA",
+  PROPERTY_ACCESS: "PROPERTY_ACCESS", STATEMENT_TERMINATOR: "STATEMENT_TERMINATOR",
+  LIST_SEPARATOR: "LIST_SEPARATOR", KEY_VALUE_SEPARATOR: "KEY_VALUE_SEPARATOR",
+  PAREN_OPEN: "PAREN_OPEN", PAREN_CLOSE: "PAREN_CLOSE",
+  BLOCK_START: "BLOCK_START", BLOCK_END: "BLOCK_END",
+  BRACKET_OPEN: "BRACKET_OPEN", BRACKET_CLOSE: "BRACKET_CLOSE",
+  STRING_LITERAL: "STRING_LITERAL",
+  ARRAY_MAP: "ARRAY_MAP", ARRAY_FILTER: "ARRAY_FILTER",
+  DOM_HTML: "DOM_HTML", DOM_TEXT: "DOM_TEXT",
+  PRINT: "PRINT", DOLLAR: "DOLLAR", PLUS: "PLUS"
+});
+
+class UniversalGrammar {
+  static spokenPatterns = [
+    { token: UniversalToken.PAREN_OPEN, regex: /\b(abrir\s+parentesis|open\s+parenthesis|open\s+paren|abrir\s+parênteses)\b/i },
+    { token: UniversalToken.PAREN_CLOSE, regex: /\b(cerrar\s+parentesis|close\s+parenthesis|close\s+paren|fechar\s+parênteses)\b/i },
+    { token: UniversalToken.PAREN_OPEN, regex: /\b(parentesis?|parenthesis|paren|parênteses)\b/i },
+    { token: UniversalToken.BLOCK_START, regex: /\b(abrir\s+llave|llave\s+abre|open\s+brace|curly\s+brace|abrir\s+chave|chave\s+abre)\b/i },
+    { token: UniversalToken.BLOCK_END, regex: /\b(cerrar\s+llave|llave\s+cierra|close\s+brace|fechar\s+chave|chave\s+fecha)\b/i },
+    { token: UniversalToken.BLOCK_START, regex: /\b(llaves?|braces?|chaves?)\b/i },
+    { token: UniversalToken.BRACKET_OPEN, regex: /\b(abrir\s+corchete|open\s+bracket|abrir\s+colchete)\b/i },
+    { token: UniversalToken.BRACKET_CLOSE, regex: /\b(cerrar\s+corchete|close\s+bracket|cerrar\s+colchete)\b/i },
+    { token: UniversalToken.BRACKET_OPEN, regex: /\b(corchetes?|brackets?|colchetes?)\b/i },
+    { token: UniversalToken.LAMBDA, regex: /\b(flecha|arrow\s+function|arrow|lambda)\b/i },
+    { token: UniversalToken.PLUS, regex: /\b(más|mas|plus)\b/i },
+    { token: UniversalToken.DOLLAR, regex: /\b(signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\b/i },
+    { token: UniversalToken.STRING_LITERAL, regex: /\b(comillas?|comisa|quotes?|aspas)\b/i },
+    { token: UniversalToken.EQUALITY, regex: /\b(igual\s+igual\s+igual|triple\s+equals?|tres\s+iguales|triple\s+igual)\b/i },
+    { token: UniversalToken.EQUALITY, regex: /\b(igual\s+igual|double\s+equals?|dos\s+iguales|equals\s+equals)\b/i },
+    { token: UniversalToken.ASSIGN, regex: /\b(igual|equals?|atribuir)\b/i },
+    { token: UniversalToken.STATEMENT_TERMINATOR, regex: /\b(punto\s+y\s+coma|semicolon|ponto\s+e\s+virgula)\b/i },
+    { token: UniversalToken.KEY_VALUE_SEPARATOR, regex: /\b(dos\s+puntos|two\s+points|colon|dois\s+pontos)\b/i },
+    { token: UniversalToken.PROPERTY_ACCESS, regex: /\b(punto|dot|ponto)\b/i },
+    { token: UniversalToken.LIST_SEPARATOR, regex: /\b(coma|comma|vírgula)\b/i },
+    { token: UniversalToken.ARRAY_MAP, regex: /\b(maps?|mapear)\b/i },
+    { token: UniversalToken.ARRAY_FILTER, regex: /\b(filter|filtrar|filtros?)\b/i },
+    { token: UniversalToken.DOM_HTML, regex: /\b(html|innerhtml)\b/i },
+    { token: UniversalToken.DOM_TEXT, regex: /\b(text\s*content|textcontent|innertext)\b/i },
+    { token: UniversalToken.PRINT, regex: /\b(print|printf|imprimir|escrever|console\s*log)\b/i }
+  ];
+
+  static tokenizeSpeech(transcript) {
+    const tokens = [];
+    const norm = transcript.toLowerCase();
+    for (const p of this.spokenPatterns) {
+      if (p.regex.test(norm)) tokens.push(p.token);
+    }
+    return tokens;
+  }
+
+  static compileToken(token, target) {
+    if (target !== "typescript") return "";
+    const map = {
+      [UniversalToken.ASSIGN]: "=", [UniversalToken.EQUALITY]: "===",
+      [UniversalToken.LAMBDA]: "=>", [UniversalToken.PROPERTY_ACCESS]: ".",
+      [UniversalToken.STATEMENT_TERMINATOR]: ";", [UniversalToken.LIST_SEPARATOR]: ",",
+      [UniversalToken.KEY_VALUE_SEPARATOR]: ":", [UniversalToken.PAREN_OPEN]: "(",
+      [UniversalToken.PAREN_CLOSE]: ")", [UniversalToken.BLOCK_START]: "{",
+      [UniversalToken.BLOCK_END]: "}", [UniversalToken.BRACKET_OPEN]: "[",
+      [UniversalToken.BRACKET_CLOSE]: "]", [UniversalToken.STRING_LITERAL]: "'",
+      [UniversalToken.ARRAY_MAP]: ".map", [UniversalToken.ARRAY_FILTER]: ".filter",
+      [UniversalToken.DOM_HTML]: ".innerHTML", [UniversalToken.DOM_TEXT]: ".textContent",
+      [UniversalToken.PRINT]: "console.log", [UniversalToken.DOLLAR]: "$",
+      [UniversalToken.PLUS]: "+"
+    };
+    return map[token] || "";
+  }
+}
+
+// ===== INLINED SpeechNormalizer =====
+const conversationalWords = [
+  "hola","estas","estoy","haciendo","metiendo","mediante",
+  "todavia","modelo","baile","codigo","ahora","parte",
+  "donde","despues","toca","contador","equivoco","escritura",
+  "correcta","claramente","necesito","bueno","okay","chao"
+];
+
+function normalizeSpeech(text) {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/\[[^\]]+\]/g," ").replace(/[`"']/g," ")
+    .replace(/[,:;¡!¿]/g," ").replace(/\s+/g," ").trim().toLowerCase();
+}
+
+function normalizeIdentifierSpeech(text) {
+  return text
+    .replace(/\b(?:consola|consol)\s*(?:\.|punto|dot)?\s*log\b/gi,"console.log")
+    .replace(/\b(?:e)?sprint\s+f\b/gi,"printf")
+    .replace(/\b(?:e)?sprint\s*efe\b/gi,"printf")
+    .replace(/\b(?:e)?sprint\b/gi,"print")
+    .replace(/\bprint\s+f\b/gi,"printf")
+    .replace(/\binnerhtml\b/gi,"innerHTML")
+    .replace(/\btextcontent\b/gi,"textContent")
+    .replace(/\binner\s+html\b/gi,"innerHTML")
+    .replace(/\btext\s+content\b/gi,"textContent")
+    .replace(/\barrow\s+function\b/gi,"arrow")
+    .replace(/\bflecha\s+function\b/gi,"flecha");
+}
+
+function extractContextLexicon(contextHint) {
+  if (!contextHint) return [];
+  const vis = contextHint.match(/identificadores_visibles:\s*([^\n<]+)/i)?.[1];
+  if (vis) return vis.split(/[,\s]+/).map(v=>v.trim()).filter(v=>/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(v));
+  const stop = new Set(["ide_context","tipo","contexto_visible_de_ide","lenguaje_probable","JavaScript","tema",
+    "identificadores_visibles","tokens_visibles","instruccion","usar","solo","para","elegir",
+    "identificadores","cuando","audio","sea","ambiguo","completar","lineas","mencione","lista","de","notas","filtradas"]);
+  const vals = new Set();
+  const matches = contextHint.match(/[A-Za-z_$][A-Za-z0-9_$]*/g)??[];
+  for (const m of matches) {
+    if (m.length<=1||stop.has(m)) continue;
+    if (/[A-Z]/.test(m.slice(1))||/^(id|if|map|const|active|length|innerHTML|textContent|nota)$/.test(m)) vals.add(m);
+  }
+  return Array.from(vals);
+}
+
+function transcriptMentionsIdentifier(normalized, identifier) {
+  const ni = identifier.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/[^A-Za-z0-9_$]+/g," ").toLowerCase();
+  if (normalized.replace(/[^a-z0-9_$]+/g,"").includes(ni.replace(/\s+/g,""))) return true;
+  if (identifier==="noteList") return /\b(?:node|note)\s+list\b/i.test(normalized);
+  if (identifier==="notasFiltradas") return /\bnota?s?\s+filtradas?\b/i.test(normalized);
+  if (identifier==="noteCount") return /\b(?:note|notes|node)\s*(?:count|com)?\b/i.test(normalized);
+  if (identifier==="noteActiveId") return /\b(?:note\s+active\s+id|no\s+(?:esta|te)\s+(?:ahi|active|activas?)\s*(?:aqui|id)?)\b/i.test(normalized);
+  if (identifier==="activeClass") return /\bactive\s+class\b/i.test(normalized);
+  return false;
+}
+
+function extractActionHints(normalized) {
+  const actions=[];
+  const add=v=>{if(!actions.includes(v))actions.push(v);};
+  if (/\b(?:printf|print|imprimir|console\.log)\b/i.test(normalized)) add("print");
+  if (/\b(?:if|condicion|condition)\b/i.test(normalized)) add("condition");
+  if (/\b(?:map|maps|mapear)\b/i.test(normalized)) add("map");
+  if (/\b(?:filter|filtrar|filtros?)\b/i.test(normalized)) add("filter");
+  if (/\b(?:html|innerHTML)\b/i.test(normalized)) add("render_html");
+  if (/\b(?:textContent|text\s+content|innerText)\b/i.test(normalized)) add("update_text");
+  if (/\b(?:igual)\b/i.test(normalized)) add("assign_or_compare");
+  if (/\b(?:arrow|flecha)\b/i.test(normalized)) add("arrow_function");
+  return actions.slice(0,6);
+}
+
+function buildCodeNotes(text, contextHint) {
+  const norm = normalizeIdentifierSpeech(normalizeSpeech(text));
+  const lexicon = extractContextLexicon(contextHint);
+  const mentioned = lexicon.filter(id=>transcriptMentionsIdentifier(norm,id));
+  const verbs = extractActionHints(norm);
+  const notes=[];
+  if (mentioned.length) notes.push("identifiers: "+mentioned.join(", "));
+  if (verbs.length) notes.push("actions: "+verbs.join(", "));
+  if (/\b(?:node|note)\s+list\b/i.test(norm)&&lexicon.includes("noteList"))
+    notes.push("uncertain: node/note list likely noteList");
+  if (/\bnota?s?\s+filtradas?\b/i.test(norm)&&lexicon.includes("notasFiltradas"))
+    notes.push("uncertain: nota filtradas likely notasFiltradas");
+  if (/\b(?:notes?|node)\s*(?:\.?\s*com|\.|punto|dot)?\s*text\s+content\b/i.test(norm)&&lexicon.includes("noteCount"))
+    notes.push("uncertain: notes.com text content likely noteCount.textContent");
+  return notes;
+}
+
+function normalizeStringLiteral(v) {
+  return v.replace(/\s+/g," ").replace(/\s+([).,;:!?])/g,"$1").trim();
+}
+
+function normalizeSpokenCodeTokens(text) {
+  const span = extractCodeLikeSpan(text);
+  if (!span) return "";
+  const tokens = span.split(/\s+/).filter(Boolean);
+  if (!tokens.some(t=>spokenSymbolToken(t))) return "";
+  let norm = normalizeIdentifierSpeech(span);
+  let parenCount=0;
+  norm = norm.replace(/\b(?:(abrir|cerrar|open|close|fechar)\s+)?(parentesis?|parenthesis|paren|parentheses)\b/gi,(m,p)=>{
+    if (p) return m;
+    parenCount++;
+    return parenCount%2===1?"abrir parentesis":"cerrar parentesis";
+  });
+  let braceCount=0;
+  norm = norm.replace(/\b(?:(abrir|cerrar|open|close|fechar)\s+)?(llaves?|braces?|chaves?)\b/gi,(m,p)=>{
+    if (p) return m;
+    braceCount++;
+    return braceCount%2===1?"abrir llave":"cerrar llave";
+  });
+  let bracketCount=0;
+  norm = norm.replace(/\b(?:(abrir|cerrar|open|close|fechar)\s+)?(corchetes?|brackets?|colchetes?)\b/gi,(m,p)=>{
+    if (p) return m;
+    bracketCount++;
+    return bracketCount%2===1?"abrir corchete":"cerrar corchete";
+  });
+  for (const pattern of UniversalGrammar.spokenPatterns) {
+    const repl = UniversalGrammar.compileToken(pattern.token,"typescript");
+    norm = norm.replace(new RegExp(pattern.regex.source,"gi"), repl);
+  }
+  norm = norm.replace(/\s*([().,;:={}[\]"'])\s*/g,"$1")
+    .replace(/\.{2,}/g,m=>m.length===3?"...":".")
+    .replace(/;\)/g,");").replace(/;\}/g,"};")
+    .replace(/\s*=>\s*/g," => ").replace(/\s+/g," ").trim();
+  return looksLikeCode(norm)&&!looksLikeProseCode(norm)&&!looksMalformedCode(norm)?norm:"";
+}
+
+function extractCodeLikeSpan(text) {
+  const norm = normalizeIdentifierSpeech(text);
+  const marker = norm.search(/\b(?:console\.log|printf?|if|const|let|var|function|map|innerHTML|textContent|length|count|notasfiltradas|notas|note(?:list|count|activeid)?|nodelist|nodecount)\b|=>|===|==|=|\(|\)|\b(?:parentesis|comillas?|punto|igual|flecha|arrow|colon|semicolon|llave|corchete)\b/i);
+  if (marker<0) return "";
+  const before = norm.slice(0,marker).trim();
+  const beforeWords = before.split(/\s+/).filter(Boolean);
+  const stop = /^(?:el|la|los|las|un|una|unos|unas|este|esta|estos|estas|y|o|que|de|del|en|al|por|para|con|sin|su|tu|mi|se|le|lo|la|no|si|me|te|es|fue|era|son|ser|hay|muy|mas|pero|como|cuando|donde|tiene|tengo|estoy|estas|esta|estamos|estan|estaba|estado|hacer|hace|hago|haciendo|voy|va|vas|vamos|van|iba|he|has|ha|han|habia|haber|puedo|puede|pueden|puedes|pueda|pudiera|sido|siendo|dice|dijo|dicen|dar|dio|dan|dando|dado|saber|sabe|sabes|saben|sabia|sabido|poner|pone|pones|ponen|puso|puesto|poniendo|tener|tenia|tenido|tiene|tienes|tienen|venir|viene|vienes|vienen|vino|venido|venir|sacar|saca|sacas|sacan|saco|sacado|sacar|dejar|deja|dejas|dejan|dejo|dejado|dejando|buscar|busca|buscas|buscan|busco|buscado|buscando)$/i;
+  const contextWords = beforeWords.slice(-3).filter(w=>!stop.test(w));
+  let span = (contextWords.length?contextWords.join(" ")+" ":"")+norm.slice(marker).trim();
+  const boundary = span.search(/\b(?:bueno|okay|despues|luego|me toca|estoy metiendo|si no me equivoco|eso es todo|chao|gracias)\b/i);
+  if (boundary>0) span = span.slice(0,boundary).trim();
+  const weak = span.match(/^(?:codigo|notas?|note)\b/i);
+  if (weak) {
+    const s = span.search(/\b(?:console\.log|printf?|if|const|let|var|function|map|innerHTML|textContent|length|count|notasfiltradas|note(?:list|count|activeid)|nodelist|nodecount)\b|=>|===|==|=|\(|\)|\b(?:parentesis|comillas?|punto|igual|flecha|arrow)\b/i);
+    if (s>weak[0].length) span = span.slice(s).trim();
+  }
+  return span;
+}
+
+function normalizationTags(source, code, baseTags) {
+  const tags = new Set(baseTags);
+  if (UniversalGrammar.tokenizeSpeech(source).length>0) tags.add("probable_punctuation");
+  if (/[()"'.,;:={}[\]<>]|=>/.test(code)) tags.add("normalized_signs");
+  if (/\(\s*["']/.test(code)) tags.add("probable_string_argument");
+  return Array.from(tags);
+}
+
+function spokenSymbolToken(token) { return UniversalGrammar.tokenizeSpeech(token).length>0; }
+
+function looksLikeCode(v) {
+  const hasClearSign = /[()\[\]{}]|=>|==|=|[;:]/.test(v);
+  const hasKeywords = /\b(console\.log|printf?|if|else|const|let|var|function|map|innerHTML|textContent|length|count)\b/i.test(v);
+  const text = v.toLowerCase();
+  if (/\b(hola|como estas|bueno|chao|gracias|saludos)\b/.test(text)&&!hasKeywords) return false;
+  return hasClearSign||hasKeywords;
+}
+
+function looksLikeProseCode(v) {
+  const t = v.toLowerCase();
+  if (/^(hola|estoy|necesito|bueno|okay)\b/.test(t)) return true;
+  if (/[?¿]/.test(v)) return true;
+  const words = t.match(/\b[a-záéíóúñ]{3,}\b/gi)??[];
+  if (words.length>=18) {
+    const prose = words.filter(w=>conversationalWords.includes(w.normalize("NFD").replace(/[\u0300-\u036f]/g,""))).length;
+    const syntax = (v.match(/[()[\]{}=;:]|=>|\./g)??[]).length;
+    if (prose>=4&&syntax<prose+4) return true;
+  }
+  return false;
+}
+
+function looksMalformedCode(v) {
+  const t = v.toLowerCase();
+  if (/^[=)\]}]/.test(v.trim())) return true;
+  if (/====/.test(v)) return true;
+  if (/\b(con|esta|ahi|aqui|bueno|okay|comisa|comida|icon|lane|ignor|ignot)\b/i.test(t)&&!/[(){};]/.test(v)) return true;
+  const words = t.match(/\b[a-z][a-z0-9_$]*\b/gi)??[];
+  const syntax = (v.match(/[()[\]{}=;:]|=>|\./g)??[]).length;
+  return words.length>8&&syntax<3;
+}
+
+function inferNotCondition(text) {
+  const norm = normalizeIdentifierSpeech(text);
+  const m = norm.match(/\bif\s+(?:not|no)\s+([a-z_$][\w$]*)\b/i);
+  if (!m) return "";
+  let id = m[1];
+  if (id.toLowerCase()==="going"&&/\bcount\b/i.test(norm)) id="count";
+  return `if (!${id})`;
+}
+
+function inferPrintfCall(text) {
+  const norm = normalizeIdentifierSpeech(text);
+  if (!/\bprintf\b/i.test(norm)) return "";
+  const quoted = norm.match(/\b(?:comilla|comillas|quote|quotes?)\s+(.+)\s+(?:comilla|comillas|quote|quotes?)\b/i);
+  let raw = quoted?.[1]?.trim()??"";
+  raw = raw.replace(/\b(?:comilla|comillas|quote|quotes?)\b/gi,"");
+  let arg = raw
+    .replace(/\b(?:signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\s*llave\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+llave\b/gi,(_,g1)=>`\${${g1}}`)
+    .replace(/\b(?:signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\s*([a-zA-Z_$][a-zA-Z0-9_$]*)/gi,(_,g1)=>`$${g1}`)
+    .replace(/\b(?:signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\b/gi,"$");
+  arg = arg.replace(/\bcoma\b/gi,",").replace(/\bpunto\b/gi,".")
+    .replace(/\bdos\s+puntos\b/gi,":")
+    .replace(/\b(?:par.?ntesis?|parentesis?|parenthesis|paren|colon|igual|flecha|arrow)\b/gi," ")
+    .replace(/\s+/g," ").trim();
+  return arg?`printf("${normalizeStringLiteral(arg)}"):`:"printf()";
+}
+
+function inferFromContextualLexicon(text, lexicon) {
+  if (!lexicon.length) return "";
+  let norm = normalizeIdentifierSpeech(text);
+  for (const id of lexicon) {
+    const words = id.replace(/([a-z])([A-Z])/g,"$1 $2").toLowerCase().split(/[^a-z0-9]+/);
+    if (words.length>1) {
+      const parts = words.map((w,i)=>{
+        if (/^(?:note|node|nota|notas)$/i.test(w)) return "(?:note|node|nota|notas?)";
+        if (/^(?:list|lista)$/i.test(w)) return "(?:list|lista)";
+        if (/^(?:active|activo|activa)$/i.test(w)) return "(?:active|activo|activa|activas?)";
+        if (/^(?:class|clase)$/i.test(w)) return "(?:class|clase|classes?)";
+        if (/^id$/i.test(w)) return i===words.length-1&&words.length>2?"(?:id|ids|identificador|aqui)?":"(?:id|ids|identificador|aqui)";
+        if (/^(?:filtradas|filtrada|filtro)$/i.test(w)) return "(?:filtradas?|filtro|filter)";
+        if (/^(?:count|counter)$/i.test(w)) return i===words.length-1&&words.length>2?"(?:count|counter|cuenta|com)?":"(?:count|counter|cuenta|com)";
+        return w;
+      });
+      const re = new RegExp("\\b"+parts.filter(Boolean).join("\\s*")+"\\b","gi");
+      norm = norm.replace(re, id);
+    } else {
+      norm = norm.replace(new RegExp("\\b"+id+"\\b","gi"), id);
+    }
+  }
+  return normalizeSpokenCodeTokens(norm);
+}
+
+function inferCodeFromSpeech(text, contextHint) {
+  const normalized = normalizeSpeech(text);
+  const notes = buildCodeNotes(text, contextHint);
+  const ctx = inferFromContextualLexicon(normalized, extractContextLexicon(contextHint));
+  if (ctx) return { code: ctx, tags: normalizationTags(normalized,ctx,["context_lexicon_reconstruction"]), notes };
+  const notC = inferNotCondition(normalized);
+  if (notC) return { code: notC, tags: normalizationTags(normalized,notC,["spoken_not_condition"]), notes };
+  const printC = inferPrintfCall(normalized);
+  if (printC) return { code: printC, tags: normalizationTags(normalized,printC,["spoken_print_call"]), notes };
+  const tokenC = normalizeSpokenCodeTokens(normalized);
+  return { code: tokenC, tags: tokenC?normalizationTags(normalized,tokenC,["spoken_symbol_normalization"]):[], notes };
+}
+
+function hasCodePatterns(text, contextHint) {
+  const norm = normalizeIdentifierSpeech(normalizeSpeech(text));
+  const lexicon = extractContextLexicon(contextHint);
+  const hasSpokenPunctuation = UniversalGrammar.tokenizeSpeech(norm).length>0;
+  const hasCodeKeywords = /\b(?:console\.?log|print(?:f)?|if|else|for|while|function|const|let|var|return|map|filter|reduce|forEach)\b/i.test(norm);
+  const hasDomIdentifiers = /\b(?:innerHTML|textContent|innerText|classList|querySelector|addEventListener|length|count|value|style|display|className)\b/i.test(norm);
+  const hasCompoundIdentifiers = /\b\w+[A-Z]\w*\b|\b\w+\.\w+\b/.test(text);
+  const hasCodeDelimiters = /[(){}[\]]/.test(text);
+  const hasContextIdentifier = lexicon.some(id=>transcriptMentionsIdentifier(norm,id));
+  if (hasSpokenPunctuation&&(hasCodeKeywords||hasDomIdentifiers||hasCompoundIdentifiers||hasCodeDelimiters||hasContextIdentifier)) return true;
+  if (hasContextIdentifier&&(hasCodeKeywords||hasDomIdentifiers)) return true;
+  let sig=0;
+  if (hasSpokenPunctuation) sig++;
+  if (hasCodeKeywords) sig++;
+  if (hasDomIdentifiers) sig++;
+  if (hasCompoundIdentifiers) sig++;
+  if (hasCodeDelimiters) sig++;
+  if (hasContextIdentifier) sig++;
+  return sig>=2;
+}
+
+// ===== TEST CASES =====
+const TEST_CASES = [
+  { id:"TC-01", desc:"Printf Hola mundo", input:'el codigo es printf parentesis comilla Hola mundo comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-02", desc:"Printf + $variable", input:'printf parentesis comilla valor signo pesos var comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-03", desc:"Printf + ${...} template", input:'printf parentesis comilla total signo pesos llave monto llave comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-04", desc:"If not count", input:'if not count', expectLocal:true },
+  { id:"TC-05", desc:"Console.log via consola", input:'consola punto log parentesis comilla test comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-06", desc:"Arrow function suma", input:'const suma igual parentesis a coma b parentesis flecha a mas b',
+    expectLocal:true },
+  { id:"TC-07", desc:".map array", input:'items punto map parentesis item flecha item punto id parentesis',
+    expectLocal:true },
+  { id:"TC-08", desc:".filter array", input:'notas punto filter parentesis n flecha n punto activo igual igual igual true parentesis',
+    expectLocal:true },
+  { id:"TC-09", desc:".innerHTML = texto", input:'div punto innerHTML igual comilla ok comilla',
+    expectLocal:true },
+  { id:"TC-10", desc:"Array literal []", input:'const arr igual corchete 1 coma 2 coma 3 corchete',
+    expectLocal:true },
+  { id:"TC-11", desc:"If equality ===", input:'if parentesis x igual igual igual 5 parentesis abrir llave cerrar llave',
+    expectLocal:true },
+  { id:"TC-12", desc:"Mispronunciation esprint f", input:'esprint f parentesis comilla hola comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-13", desc:"Dolar spanglish", input:'printf parenthesis quote hello dollar name quote semicolon',
+    expectLocal:true },
+  { id:"TC-14", desc:"Context lexicon noteList", input:'mostrar note list filtrada',
+    contextHint:'identificadores_visibles: noteList, notasFiltradas, noteCount',
+    expectLocal:false, expectIdentifiers:true },
+  { id:"TC-15", desc:"Conversation (no code)", input:'Hola como estas todo bien espero que si',
+    expectLocal:false },
+  { id:"TC-16", desc:"Dictation stutter", input:'printf parentesis comilla comilla hola comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-17", desc:"Let declaration", input:'let x igual 10', expectLocal:true },
+  { id:"TC-18", desc:"Repro bug original", input:'Hola como estas justamente el codigo es printf parentesis comilla Hola mundo comilla punto signo pesos variable parentesis comilla punto y coma',
+    expectLocal:true },
+  { id:"TC-19", desc:"Long transcript + printf", input:'te quiero pedir que hagas un codigo simple printf parentesis comilla hola mundo comilla punto y coma nada mas',
+    expectLocal:true },
+  { id:"TC-20", desc:"Mixed symbols", input:'const resultado igual notas punto filter parentesis n flecha n punto activo igual igual igual true parentesis punto map parentesis n flecha n punto nombre parentesis',
+    expectLocal:true },
+];
+
+const results = [];
+let llmAvailable = false;
+
+async function checkModel() {
+  const info = document.getElementById("llmInfo");
+  const statusText = document.getElementById("llmStatusText");
+  const errorDetail = document.getElementById("llmErrorDetail");
+  info.style.display = "block";
+
+  let lmAPI = window.LanguageModel;
+  if (!lmAPI && window.ai?.languageModel) lmAPI = window.ai.languageModel;
+
+  if (!lmAPI) {
+    statusText.textContent = " No hay API de LanguageModel disponible.";
+    errorDetail.textContent = "Necesitas Chrome 131+ con chrome://flags/#optimization-guide-on-device-model habilitado.";
+    document.getElementById("modelStatus").textContent = "API no encontrada";
+    document.getElementById("modelStatus").className = "fail";
+    return;
+  }
+
+  try {
+    let textAvail = "no";
+    if (typeof lmAPI.availability === "function") {
+      textAvail = await lmAPI.availability({ expectedInputs: [{ type: "text", languages: ["en","es"] }], expectedOutputs: [{ type: "text", languages: ["es","en"] }] }).catch(() => "no");
+    } else if (typeof lmAPI.capabilities === "function") {
+      const caps = await lmAPI.capabilities().catch(() => null);
+      textAvail = caps?.available || "no";
+    } else {
+      textAvail = "available";
+    }
+
+    if (textAvail === "readily" || textAvail === "available") {
+      llmAvailable = true;
+      document.getElementById("modelStatus").textContent = "DISPONIBLE ("+textAvail+")";
+      document.getElementById("modelStatus").className = "pass";
+      statusText.innerHTML = ' Modelo listo para usar.';
+      errorDetail.textContent = "";
+      info.style.background = "#064e3b";
+    } else if (textAvail === "downloadable" || textAvail === "downloading") {
+      document.getElementById("modelStatus").textContent = "DESCARGABLE ("+textAvail+")";
+      document.getElementById("modelStatus").className = "warn";
+      statusText.textContent = " Modelo no descargado. Abri chrome://components y hace click en 'Check for update' en 'Optimization Guide On Device Model'.";
+      errorDetail.textContent = "O ejecuta un test con LLM igual para forzar la descarga (puede tardar).";
+    } else {
+      document.getElementById("modelStatus").textContent = "NO disponible ("+textAvail+")";
+      document.getElementById("modelStatus").className = "fail";
+      statusText.textContent = " Modelo no disponible.";
+      errorDetail.textContent = "Verifica que Chrome 131+ tenga el flag 'Optimization Guide On Device Model' habilitado.";
+    }
+  } catch(e) {
+    document.getElementById("modelStatus").textContent = "Error: "+e.message;
+    document.getElementById("modelStatus").className = "fail";
+    errorDetail.textContent = "Error al consultar disponibilidad: "+e.message;
+  }
+
+  if (llmAvailable) {
+    document.getElementById("copyBtn").disabled = false;
+    document.getElementById("exportBtn").disabled = false;
+  }
+}
+
+async function runTest(test, useLlm) {
+  const start = performance.now();
+  const hasCode = hasCodePatterns(test.input, test.contextHint||"");
+  const inference = inferCodeFromSpeech(test.input, test.contextHint||"");
+
+  // Validate local result
+  let localOk = true;
+  if (test.expectLocal && !inference.code) { localOk = false; }
+  if (!test.expectLocal && inference.code) { localOk = false; }
+
+  let llmResp = "(no ejecutado)";
+  let llmOk = null;
+  let llmTime = 0;
+
+  if (useLlm && llmAvailable) {
+    const officialPrompt = `You are DuckRubber, a local technical rubber-duck for Spanish or English voice input.
+You receive a transcription AND a [CODE SKETCH] from a local normalizer.
+Your job is to VALIDATE and CORRECT the sketch, not to write it from scratch.
+Return ONLY valid XML. Do not use markdown or prose outside XML tags.
+Use exactly this structure:
+<response>
+  <think></think>
+  <tags></tags>
+  <transcript></transcript>
+  <code></code>
+  <answer></answer>
+  <directed></directed>
+  <lang></lang>
+  <needs_context></needs_context>
+  <phonetic_corrections></phonetic_corrections>
+</response>
+
+RULES:
+- <think>: Internal audit note in ENGLISH. Max 12 words.
+- <tags>: Max 8 comma-separated tags. If conversation without code, include 'charla' or 'saludo'.
+- <transcript>: Copy the received transcription verbatim.
+- <code>: You receive [CODE SKETCH]. Guidelines:
+  * If complete and correct, return it as-is.
+  * If syntax errors (unclosed parens, misplaced ;), fix them.
+  * If empty but user mentioned code, generate from transcription.
+  * If user just greets or chats, leave <code> empty.
+  * Do NOT add code not dictated. Do NOT turn '$var' into '%s'.
+  * Do NOT use '>' or other prefixes. Clean code only.
+  * CRITICAL: If [CODE SKETCH] has content, NEVER leave <code> empty.
+- <answer>: MAX 15 words. No greetings. If sketch is complete: 'Done.' or 'Corrected.' If missing info, ask ONE question.
+- <directed>: true if audio is directed at the assistant.
+- <lang>: es or en.
+- <needs_context>: true if you need more IDE context.
+- <phonetic_corrections>: if user said something phonetically similar to an IDE variable.
+
+The normalizer already translated spoken punctuation into symbols.
+You only refine. Do not rewrite. Do not over-ask.`;
+    try {
+      let lmAPI = window.LanguageModel;
+      if (!lmAPI && window.ai?.languageModel) lmAPI = window.ai.languageModel;
+      const session = await lmAPI.create({
+        temperature: 0.3,
+        topK: 3,
+        initialPrompts: [{ role: "system", content: officialPrompt }],
+        expectedInputs: [{ type: "text", languages: ["en","es"] }],
+        expectedOutputs: [{ type: "text", languages: ["es","en"] }],
+      });
+      const codeHint = inference.code ? `\n[CODE DETECTED]\n[CODE SKETCH]\n${inference.code}\n[CODE NOTES]\n- tags: ${(inference.tags||[]).join(", ")}\n- notes: ${(inference.notes||[]).join("; ")}` : "";
+      const prompt = `[Response Language: es]\n[Acoustic State: calm]${codeHint}\n\nTranscripcion de voz:\n"${test.input}"`;
+      const llmStart = performance.now();
+      llmResp = await session.prompt(prompt);
+      llmTime = performance.now() - llmStart;
+      llmResp = llmResp.trim();
+      session.destroy();
+
+      // Extract code from XML
+      const codeMatch = llmResp.match(/<code>([\s\S]*?)<\/code>/i);
+      const extractedCode = codeMatch?.[1]?.trim() || "";
+      const thinkMatch = llmResp.match(/<think>([\s\S]*?)<\/think>/i);
+      const extractedThink = thinkMatch?.[1]?.trim() || "";
+      const tagsMatch = llmResp.match(/<tags>([\s\S]*?)<\/tags>/i);
+      const extractedTags = tagsMatch?.[1]?.trim() || "";
+      const answerMatch = llmResp.match(/<answer>([\s\S]*?)<\/answer>/i);
+      const extractedAnswer = answerMatch?.[1]?.trim() || "";
+
+      // Evaluate based on extracted code
+      const hasParens = /\(/.test(extractedCode);
+      const hasKeywords = /\b(?:console|print|if|const|let|var|function|map|filter|return|innerHTML|textContent)\b/i.test(extractedCode);
+      const hasBrackets = /[{}[\]]/.test(extractedCode);
+      const hasSemicolon = /;/.test(extractedCode);
+      const hasOperators = /[=+>]/.test(extractedCode);
+      const isError = extractedCode.toLowerCase().startsWith("error");
+      const isShort = extractedCode.length < 3;
+      const score = (hasParens?1:0)+(hasKeywords?2:0)+(hasBrackets?1:0)+(hasSemicolon?1:0)+(hasOperators?1:0);
+      const codeLike = score >= 2;
+      if (!isError && !isShort && codeLike) {
+        llmOk = true;
+      } else if (isError || isShort) {
+        llmOk = false;
+      } else {
+        llmOk = null;
+      }
+      llmResp = JSON.stringify({ raw: llmResp, code: extractedCode, think: extractedThink, tags: extractedTags, answer: extractedAnswer });
+    } catch(e) {
+      llmResp = JSON.stringify({ error: e.message });
+    }
+  }
+
+  const elapsed = (performance.now() - start).toFixed(1);
+  return {
+    id: test.id, desc: test.desc,
+    input: test.input.slice(0,60)+(test.input.length>60?"...":""),
+    code: inference.code||"(empty)",
+    tags: inference.tags,
+    notes: inference.notes||[],
+    hasCode, localOk, llmResp, llmOk, llmTime,
+    elapsed, expectLocal: test.expectLocal,
+    expectIdentifiers: test.expectIdentifiers||false,
+  };
+}
+
+async function runAll(useLlm) {
+  const btn = document.getElementById("runBtn");
+  const skipBtn = document.getElementById("skipLlmBtn");
+  btn.disabled = true; skipBtn.disabled = true;
+  document.getElementById("summary").style.display = "none";
+  document.getElementById("progressWrap").style.display = "block";
+  document.getElementById("statusLabel").textContent = "Ejecutando...";
+  document.getElementById("resultsBody").innerHTML = "";
+
+  const totalTimeStart = performance.now();
+  results.length = 0;
+
+  for (let i = 0; i < TEST_CASES.length; i++) {
+    const tc = TEST_CASES[i];
+    document.getElementById("progressLabel").textContent = `${i+1}/${TEST_CASES.length}`;
+    document.getElementById("progressBar").value = i + 1;
+    document.getElementById("statusLabel").textContent = `Test ${tc.id}: ${tc.desc.slice(0,40)}...`;
+
+    const r = await runTest(tc, useLlm);
+    results.push(r);
+    renderRow(r);
+  }
+
+  const totalTime = ((performance.now() - totalTimeStart)/1000).toFixed(1);
+  document.getElementById("progressTime").textContent = totalTime+"s";
+  document.getElementById("statusLabel").textContent = "Completado";
+
+  // Summary
+  const passed = results.filter(r=>r.localOk).length;
+  const failed = results.filter(r=>!r.localOk).length;
+  const llmOkCount = results.filter(r=>r.llmOk===true).length;
+  const llmFailCount = results.filter(r=>r.llmOk===false).length;
+  const llmCodeCount = results.filter(r=>{
+    if (r.llmResp === "(no ejecutado)") return false;
+    try { const p = JSON.parse(r.llmResp); return !!p.code; } catch(e) { return false; }
+  }).length;
+  document.getElementById("sumPass").textContent = passed;
+  document.getElementById("sumFail").textContent = failed;
+  document.getElementById("sumTime").textContent = totalTime+"s";
+  document.getElementById("sumLocalOk").textContent = passed+"/"+TEST_CASES.length;
+  document.getElementById("sumLlmOk").textContent = useLlm?(llmOkCount+"/"+TEST_CASES.length):"N/A";
+  document.getElementById("sumLlmCode").textContent = useLlm?llmCodeCount+"/"+TEST_CASES.length:"N/A";
+  document.getElementById("summary").style.display = "block";
+
+  // Show think/tag summary when LLM was used
+  if (useLlm) {
+    const allThink = results.map(r => {
+      try { const p = JSON.parse(r.llmResp); return p.think||""; } catch(e) { return ""; }
+    }).filter(Boolean);
+    const allTags = results.map(r => {
+      try { const p = JSON.parse(r.llmResp); return p.tags||""; } catch(e) { return ""; }
+    }).filter(Boolean).join(", ");
+    if (allThink.length) {
+      document.getElementById("llmTagSummary").textContent = "Think tags: "+allThink.join(" | ")+" | Total tags: "+allTags;
+    }
+  }
+
+  btn.disabled = false; skipBtn.disabled = false;
+  document.getElementById("copyBtn").disabled = false;
+  document.getElementById("exportBtn").disabled = false;
+}
+
+function renderRow(r) {
+  const tbody = document.getElementById("resultsBody");
+  const tr = document.createElement("tr");
+  let llmDisplay = "(no ejecutado)";
+  let llmDetail = "";
+  if (r.llmResp && r.llmResp !== "(no ejecutado)") {
+    try {
+      const parsed = JSON.parse(r.llmResp);
+      if (parsed.error) {
+        llmDisplay = `<span class="fail">ERROR</span>`;
+        llmDetail = `<div class="llm-detail">${parsed.error}</div>`;
+      } else {
+        const codePreview = parsed.code ? parsed.code.slice(0,80)+(parsed.code.length>80?"...":"") : "(vacio)";
+        llmDisplay = `<span class="code">${escHtml(codePreview)}</span>`;
+        llmDetail = `<details class="llm-detail"><summary>Ver XML completo</summary>
+          <div class="llm-xml"><pre>${escHtml(parsed.raw||"")}</pre></div>
+          <div class="llm-fields">
+            <b>think:</b> ${escHtml(parsed.think||"—")}<br>
+            <b>tags:</b> ${escHtml(parsed.tags||"—")}<br>
+            <b>code:</b> <code>${escHtml(parsed.code||"—")}</code><br>
+            <b>answer:</b> ${escHtml(parsed.answer||"—")}
+          </div>
+        </details>`;
+      }
+    } catch(e) {
+      llmDisplay = `<span class="code">${escHtml(r.llmResp.slice(0,100))}</span>`;
+    }
+  }
+  tr.innerHTML = `
+    <td>${r.id}</td>
+    <td style="font-size:0.75rem;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.desc}">${r.desc}</td>
+    <td class="code">${r.code}</td>
+    <td>${r.tags.map(t=>`<span class="tag">${t}</span>`).join(" ")}</td>
+    <td style="max-width:300px;">${llmDisplay}${llmDetail}</td>
+    <td class="${r.localOk?'pass':'fail'}">${r.localOk?'OK':'FAIL'}</td>
+    <td>${r.llmOk===null?'—':(r.llmOk?'<span class="pass">OK</span>':'<span class="fail">FAIL</span>')}</td>
+    <td>${r.elapsed}ms</td>
+  `;
+  tbody.appendChild(tr);
+}
+function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function generateMarkdown(results) {
+  let md = "| # | Descripcion | Local Code | Tags | LLM Code | Think | Answer | Local OK | LLM OK | ms |\n";
+  md += "|---|---|---|---|---|---|---|---|---|---|\n";
+  for (const r of results) {
+    const code = (r.code||"(empty)").replace(/\|/g,"\\|");
+    const tags = r.tags.join(", ").replace(/\|/g,"\\|");
+    let llmCode = "—", llmThink = "—", llmAnswer = "—";
+    if (r.llmResp && r.llmResp !== "(no ejecutado)") {
+      try {
+        const p = JSON.parse(r.llmResp);
+        if (p.code) llmCode = p.code.replace(/\|/g,"\\|").slice(0,80);
+        if (p.think) llmThink = p.think.replace(/\|/g,"\\|");
+        if (p.answer) llmAnswer = p.answer.replace(/\|/g,"\\|");
+      } catch(e) {}
+    }
+    md += `| ${r.id} | ${r.desc} | ${code} | ${tags} | ${llmCode} | ${llmThink} | ${llmAnswer} | ${r.localOk?"OK":"FAIL"} | ${r.llmOk===null?"—":r.llmOk?"OK":"FAIL"} | ${r.elapsed}ms |\n`;
+  }
+  const passed = results.filter(r=>r.localOk).length;
+  md += `\n**Resumen:** ${passed}/${results.length} local OK`;
+  const llmOkCount = results.filter(r=>r.llmOk===true).length;
+  if (llmOkCount > 0) md += ` | ${llmOkCount}/${results.filter(r=>r.llmOk!==null).length} LLM OK`;
+  return md;
+}
+
+async function copyResults() {
+  if (!results.length) return;
+  const md = generateMarkdown(results);
+  try {
+    await navigator.clipboard.writeText(md);
+    const btn = document.getElementById("copyBtn");
+    const orig = btn.textContent;
+    btn.textContent = "  Copiado!";
+    setTimeout(()=>{ btn.textContent = orig; }, 2000);
+  } catch(e) {
+    // fallback
+    const ta = document.createElement("textarea");
+    ta.value = md;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+}
+
+function exportJSON() {
+  if (!results.length) return;
+  const data = results.map(r => ({
+    id: r.id, desc: r.desc, input: r.input,
+    localCode: r.code, tags: r.tags, notes: r.notes,
+    localOk: r.localOk, llmOk: r.llmOk, elapsed: r.elapsed,
+    llm: r.llmResp === "(no ejecutado)" ? null : (()=>{ try{return JSON.parse(r.llmResp)}catch(e){return null} })()
+  }));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "ducksugar-test-results.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById("checkBtn")?.remove();
+document.getElementById("runBtn").onclick = ()=>runAll(true);
+document.getElementById("skipLlmBtn").onclick = ()=>runAll(false);
+document.getElementById("copyBtn").onclick = copyResults;
+document.getElementById("exportBtn").onclick = exportJSON;
+checkModel();
+</script>
+</body>
+</html>

@@ -55,6 +55,7 @@ export interface AudioViewDelegate {
   clearRunOutput(): void;
   onAudioDurationReady(durationMs: number): void;
   onSpeechFragment?(finalText: string, interimText: string): void;
+  onAudioProgress?(partialBlob: Blob, elapsedMs: number): void;
 }
 
 export class AudioService {
@@ -74,6 +75,7 @@ export class AudioService {
   private recordingReady: Promise<AudioAsset | null> | null = null;
   private resolveRecordingReady: ((asset: AudioAsset | null) => void) | null = null;
   private recognition: SpeechRecognition | null = null;
+  public recognitionFinished: Promise<string | null> | null = null;
 
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
@@ -113,6 +115,11 @@ export class AudioService {
     });
     this.micTranscription = null;
     this.recognition = null;
+    let resolveRecFinished: (val: string | null) => void = () => {};
+    this.recognitionFinished = new Promise<string | null>((resolve) => {
+      resolveRecFinished = resolve;
+    });
+
     this.recordedVolumeHistory = [];
     this.silencePauseCount = 0;
     delegate.clearFileSelection();
@@ -126,7 +133,12 @@ export class AudioService {
     });
 
     this.mediaRecorder.addEventListener("dataavailable", (event) => {
-      if (event.data.size > 0) this.audioChunks.push(event.data);
+      if (event.data.size > 0) {
+        this.audioChunks.push(event.data);
+        const partialBlob = new Blob([event.data], { type: this.mediaRecorder?.mimeType || "audio/webm" });
+        const elapsed = Math.round(performance.now() - this.startedAt);
+        delegate.onAudioProgress?.(partialBlob, elapsed);
+      }
     });
     this.mediaRecorder.addEventListener("stop", () => {
       const recorder = this.mediaRecorder;
@@ -141,7 +153,7 @@ export class AudioService {
       this.resolveRecordingReady = null;
     });
 
-    this.mediaRecorder.start();
+    this.mediaRecorder.start(1000);
     this.startedAt = performance.now();
     delegate.setRecordingState("Grabando...");
     onLog("recording-started", { mimeType: this.mediaRecorder.mimeType });
@@ -205,10 +217,12 @@ export class AudioService {
 
       recognition.onerror = (err) => {
         onLog("speech-recognition-error", { error: err.error, message: err.message });
+        resolveRecFinished(this.micTranscription);
       };
 
       recognition.onend = () => {
         onLog("speech-recognition-end", { final: this.micTranscription });
+        resolveRecFinished(this.micTranscription);
       };
 
       try {
@@ -217,9 +231,11 @@ export class AudioService {
         onLog("speech-recognition-started", { lang });
       } catch (err) {
         onLog("speech-recognition-start-error", { message: (err as Error).message });
+        resolveRecFinished(null);
       }
     } else {
       onLog("speech-recognition-not-supported");
+      resolveRecFinished(null);
     }
   }
 
@@ -258,6 +274,13 @@ export class AudioService {
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
     const asset = await Promise.race([this.recordingReady, timeout]);
     return asset ?? this.current;
+  }
+
+  async waitForRecognitionFinished(timeoutMs = 1500): Promise<string | null> {
+    if (!this.recognitionFinished) return this.micTranscription;
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs));
+    const result = await Promise.race([this.recognitionFinished, timeout]);
+    return result ?? this.micTranscription;
   }
 
   loadFile(file: File, delegate: AudioViewDelegate, onLog: (type: string, data?: Record<string, unknown>) => void): void {

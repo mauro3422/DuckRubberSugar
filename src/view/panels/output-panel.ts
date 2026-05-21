@@ -53,6 +53,7 @@ export class OutputPanel extends UIComponent {
       parsed.suggested_questions?.length ? `Preguntas de aclaración sugeridas:\n${parsed.suggested_questions.map((q) => `• ${q}`).join("\n")}` : "",
       parsed.phonetic_corrections?.length ? `Correcciones fonéticas / semánticas (Ansiedad de Etiquetas):\n${parsed.phonetic_corrections.map((c) => `• ${c}`).join("\n")}` : "",
       parsed.thought_tags ? `Pistas del audio (Thought Tags): ${parsed.thought_tags}` : "",
+      parsed.pipeline_trace ? `━━━━━━━━━━━━━━━━━━━━\n${parsed.pipeline_trace}` : "",
     ]
       .filter(Boolean)
       .join("\n\n");

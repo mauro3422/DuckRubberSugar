@@ -1,6 +1,17 @@
+/**
+ * DuckSugar Copilot Types System
+ * Fully organized and separated into domain-specific modules for maximum SOLID and DRY compliance.
+ */
+
+/* ==========================================================================
+   SECTION 1: LANGUAGE MODEL API & CHROME ENVIRONMENT TYPINGS
+   ========================================================================== */
+
 export type Availability = "available" | "downloadable" | "downloading" | "unavailable";
 
-export type LanguageModelContent = { type: "text"; value: string } | { type: "audio"; value: Blob };
+export type LanguageModelContent = 
+  | { type: "text"; value: string } 
+  | { type: "audio"; value: Blob };
 
 export type LanguageModelPrompt = Array<{
   role: "user";
@@ -10,6 +21,50 @@ export type LanguageModelPrompt = Array<{
 export type SessionShape = {
   methods: string[];
   props: Record<string, unknown>;
+};
+
+export type LanguageModelSession = {
+  prompt(prompt: string | LanguageModelPrompt, options?: PromptOptions): Promise<string>;
+  promptStreaming?: (prompt: string | LanguageModelPrompt, options?: PromptOptions) => AsyncIterable<string>;
+  measureContextUsage?: (prompt: string | LanguageModelPrompt, options?: PromptOptions) => Promise<unknown>;
+  clone?: () => Promise<LanguageModelSession>;
+  destroy?: () => void;
+  [key: string]: unknown;
+};
+
+export type PromptOptions = {
+  responseConstraint?: unknown;
+  omitResponseConstraintInput?: boolean;
+};
+
+export type LanguageModelFactory = {
+  availability(options: unknown): Promise<Availability>;
+  create(options: unknown): Promise<LanguageModelSession>;
+};
+
+export type AudioAsset = {
+  blob: Blob;
+  durationMs: number | null;
+};
+
+/* ==========================================================================
+   SECTION 2: PIPELINE METRICS & PERFORMANCE TRACKING
+   ========================================================================== */
+
+export type TruncatedReason = "max_stream_ms" | "stale_stream" | "repetition_stream" | "blank_stream" | "non_stream_timeout" | null;
+
+export type RepairReason = "asr_text_retry" | "json_repair" | "self_refinement";
+
+export type RepairAttempt = {
+  reason: RepairReason;
+  elapsedMs: number;
+  accepted: boolean;
+  improved: boolean;
+  scoreDelta: number | null;
+  truncated: boolean;
+  scoreBefore: number | null;
+  scoreAfter: number | null;
+  outputChars: number;
 };
 
 export type Metrics = {
@@ -41,31 +96,19 @@ export type Metrics = {
   outputTail: string | null;
 };
 
-export type TruncatedReason = "max_stream_ms" | "stale_stream" | "repetition_stream" | "blank_stream" | "non_stream_timeout" | null;
-
-export type RepairReason = "asr_text_retry" | "json_repair" | "self_refinement";
-
-export type RepairAttempt = {
-  reason: RepairReason;
+export type PromptRun = {
+  text: string;
+  usedStreaming: boolean;
   elapsedMs: number;
-  accepted: boolean;
-  improved: boolean;
-  scoreDelta: number | null;
+  firstChunkMs: number | null;
+  chunkCount: number;
   truncated: boolean;
-  scoreBefore: number | null;
-  scoreAfter: number | null;
-  outputChars: number;
+  truncatedReason: TruncatedReason;
 };
 
-export type CodexSummarySnapshot = {
-  promptVersion: string;
-  generatedAt: string;
-  runs: number;
-  transcriptAvg: number | null;
-  codeAvg: number | null;
-  repairRunRate: number;
-  tokPerSecAvg: number | null;
-};
+/* ==========================================================================
+   SECTION 3: DATASET & BENCHMARK SUITE TYPINGS
+   ========================================================================== */
 
 export type TestCase = {
   id: string;
@@ -79,6 +122,16 @@ export type BenchmarkDataset = {
   id: string;
   name: string;
   cases: TestCase[];
+};
+
+export type CodexSummarySnapshot = {
+  promptVersion: string;
+  generatedAt: string;
+  runs: number;
+  transcriptAvg: number | null;
+  codeAvg: number | null;
+  repairRunRate: number;
+  tokPerSecAvg: number | null;
 };
 
 export type BenchmarkEntry = {
@@ -128,11 +181,9 @@ export type BenchmarkEntry = {
   outputTail: string | null;
 };
 
-export type EventLog = {
-  at: string;
-  type: string;
-  data: Record<string, unknown>;
-};
+/* ==========================================================================
+   SECTION 4: COGNITIVE NORMALIZATION & DIALOGUE RESPONSES
+   ========================================================================== */
 
 export type ParsedResponse = {
   think?: string;
@@ -153,6 +204,9 @@ export type ParsedResponse = {
   detected_topics?: string[];
   suggested_questions?: string[];
   phonetic_corrections?: string[];
+  confidence?: number;
+  reasoning?: string;
+  pipeline_trace?: string;
 };
 
 export type TranscriptDiff = {
@@ -187,38 +241,14 @@ export type Report = {
   events: EventLog[];
 };
 
-export type LanguageModelSession = {
-  prompt(prompt: string | LanguageModelPrompt, options?: PromptOptions): Promise<string>;
-  promptStreaming?: (prompt: string | LanguageModelPrompt, options?: PromptOptions) => AsyncIterable<string>;
-  measureContextUsage?: (prompt: string | LanguageModelPrompt, options?: PromptOptions) => Promise<unknown>;
-  clone?: () => Promise<LanguageModelSession>;
-  destroy?: () => void;
-  [key: string]: unknown;
-};
+/* ==========================================================================
+   SECTION 5: APPLICATION ARCHITECTURE & CONTEXT STATE
+   ========================================================================== */
 
-export type PromptOptions = {
-  responseConstraint?: unknown;
-  omitResponseConstraintInput?: boolean;
-};
-
-export type PromptRun = {
-  text: string;
-  usedStreaming: boolean;
-  elapsedMs: number;
-  firstChunkMs: number | null;
-  chunkCount: number;
-  truncated: boolean;
-  truncatedReason: TruncatedReason;
-};
-
-export type LanguageModelFactory = {
-  availability(options: unknown): Promise<Availability>;
-  create(options: unknown): Promise<LanguageModelSession>;
-};
-
-export type AudioAsset = {
-  blob: Blob;
-  durationMs: number | null;
+export type EventLog = {
+  at: string;
+  type: string;
+  data: Record<string, unknown>;
 };
 
 export type AppState = {
@@ -241,6 +271,8 @@ export type AppState = {
   benchmarkHistory: CodexSummarySnapshot[];
   dynamicPromptVersion?: string;
   manualTranscript?: string;
+  manualTranscriptEs?: string;
+  manualTranscriptEn?: string;
   isTranscribingAudio?: boolean;
   detectedEmpathyMood?: "calm" | "focus" | "tired" | "frustrated";
   empathyWpm?: number;

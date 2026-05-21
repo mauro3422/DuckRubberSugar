@@ -60,11 +60,52 @@ export class SpeechNormalizer {
     }
 
     const tokenCode = this.normalizeSpokenCodeTokens(normalized);
-    return {
-      code: tokenCode,
-      tags: tokenCode ? this.normalizationTags(normalized, tokenCode, ["spoken_symbol_normalization"]) : [],
-      notes,
-    };
+    if (tokenCode) {
+      return {
+        code: tokenCode,
+        tags: this.normalizationTags(normalized, tokenCode, ["spoken_symbol_normalization"]),
+        notes,
+      };
+    }
+
+    // Fallback: if code notes have identifiers + actions, generate a rough skeleton
+    const skeleton = this.inferCodeSkeleton(notes, text, contextHint);
+    if (skeleton) {
+      return {
+        code: skeleton,
+        tags: ["code_skeleton_fallback"],
+        notes,
+      };
+    }
+
+    return { code: "", tags: [], notes };
+  }
+
+  static inferCodeSkeleton(notes: string[], text: string, contextHint: string): string {
+    const idNote = notes.find(n => n.startsWith("identifiers:"));
+    if (!idNote) return "";
+    const identifiers = idNote.replace("identifiers:", "").trim().split(/,\s*/);
+    const actionNote = notes.find(n => n.startsWith("actions:"));
+    if (!actionNote) return "";
+    const actions = actionNote.replace("actions:", "").trim().split(/,\s*/);
+
+    // Generate skeleton from common action patterns
+    if (actions.includes("map") && actions.includes("render_html")) {
+      const listVar = identifiers.find(id => /[Ll]ist/.test(id)) || identifiers[0];
+      const filteredVar = identifiers.find(id => /[Ff]iltradas?/.test(id)) || identifiers[1] || "filtered";
+      const itemVar = identifiers.find(id => /^nota$/i.test(id)) || "item";
+      return `${listVar}.innerHTML = ${filteredVar}.map((${itemVar}) => { /* ... */ });`;
+    }
+    if (actions.includes("condition") && identifiers.length > 0) {
+      const condVar = identifiers.find(id => /[Cc]ount|[Gg]oing/.test(id)) || identifiers[0];
+      return `if (!${condVar}) { /* ... */ }`;
+    }
+    if (actions.includes("print") || actions.includes("update_text")) {
+      const target = identifiers.find(id => /[Cc]ount|[Tt]ext[Cc]ontent/.test(id)) || identifiers[0] || "value";
+      return `${target}.textContent = /* ... */;`;
+    }
+
+    return "";
   }
 
   static buildCodeNotes(text: string, contextHint = ""): string[] {
@@ -106,31 +147,39 @@ export class SpeechNormalizer {
   private static inferFromContextualLexicon(text: string, lexicon: string[]): string {
     if (!lexicon.length) return "";
 
-    const normalized = this.normalizeIdentifierSpeech(text);
-    const has = (identifier: string) => lexicon.includes(identifier);
-    const mentions = (identifier: string) => this.transcriptMentionsIdentifier(normalized, identifier);
+    let normalized = this.normalizeIdentifierSpeech(text);
 
-    if (
-      has("noteList") &&
-      has("notasFiltradas") &&
-      has("activeClass") &&
-      has("noteActiveId") &&
-      has("noteCount") &&
-      mentions("noteList") &&
-      mentions("notasFiltradas") &&
-      mentions("activeClass") &&
-      /\b(?:map|maps|arrow|flecha|igual)\b/i.test(normalized)
-    ) {
-      return [
-        "noteList.innerHTML = notasFiltradas.map(nota => { const activeClass = nota.id === noteActiveId ? 'active' : ''; });",
-        "if (noteCount) {",
-        "  noteCount.textContent = notasFiltradas.length + ' notas';",
-        "}",
-      ].join("\n");
+    // Dynamic phonetic identifier replacement
+    for (const identifier of lexicon) {
+      // Split camelCase/PascalCase to individual words
+      const words = identifier.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/);
+      if (words.length > 1) {
+        // Build a dynamic regex allowing common spoken/phonetic confusions for each word
+        const regexParts = words.map((w, index) => {
+          if (w === "note" || w === "node" || w === "nota" || w === "notas") return "(?:note|node|nota|notas?)";
+          if (w === "list" || w === "lista") return "(?:list|lista)";
+          if (w === "active" || w === "activo" || w === "activa") return "(?:active|activo|activa|activas?)";
+          if (w === "class" || w === "clase") return "(?:class|clase|classes?)";
+          if (w === "id") return index === words.length - 1 && words.length > 2 ? "(?:id|ids|identificador|aqui)?" : "(?:id|ids|identificador|aqui)";
+          if (w === "filtradas" || w === "filtrada" || w === "filtro") return "(?:filtradas?|filtro|filter)";
+          if (w === "count" || w === "counter") return index === words.length - 1 && words.length > 2 ? "(?:count|counter|cuenta|com)?" : "(?:count|counter|cuenta|com)";
+          return w;
+        });
+        
+        const pattern = new RegExp("\\b" + regexParts.filter(Boolean).join("\\s*") + "\\b", "gi");
+        normalized = normalized.replace(pattern, identifier);
+      } else {
+        // Single word identifier, replace exact case-insensitive matches
+        const pattern = new RegExp("\\b" + identifier + "\\b", "gi");
+        normalized = normalized.replace(pattern, identifier);
+      }
     }
 
-    return "";
+    // Pass through normalizer to compile spoken symbols
+    return this.normalizeSpokenCodeTokens(normalized);
   }
+
+
 
   private static inferNotCondition(text: string): string {
     const normalized = this.normalizeIdentifierSpeech(text);
@@ -149,15 +198,36 @@ export class SpeechNormalizer {
     const normalized = this.normalizeIdentifierSpeech(text);
     if (!/\bprintf\b/i.test(normalized)) return "";
 
-    const quoted = normalized.match(/\b(?:comilla|comillas|quote|quotes?)\s+(.+?)\s+(?:comilla|comillas|quote|quotes?)\b/i);
-    const rawArgument = quoted?.[1]?.trim() ?? "";
-    const argument = rawArgument
-      .replace(/\b(?:par.?ntesis?|parentesis?|parenthesis|paren|dos\s+puntos|colon|punto|coma|igual|flecha|arrow)\b/gi, " ")
+    const quoted = normalized.match(/\b(?:comilla|comillas|quote|quotes?)\s+(.+)\s+(?:comilla|comillas|quote|quotes?)\b/i);
+    let rawArgument = quoted?.[1]?.trim() ?? "";
+    
+    // Clean up intermediate stray quotes if the user had dictation stutter/misplacement
+    rawArgument = rawArgument.replace(/\b(?:comilla|comillas|quote|quotes?)\b/gi, "");
+    
+    // Process dollar/peso sign followed by variable name inside string literal first
+    let argument = rawArgument
+      .replace(/\b(?:signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\s*llave\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s+llave\b/gi, (_, g1) => `\${${g1}}`)
+      .replace(/\b(?:signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\s*([a-zA-Z_$][a-zA-Z0-9_$]*)/gi, (_, g1) => `$${g1}`)
+      .replace(/\b(?:signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|dollar|pesos)\b/gi, "$");
+      
+    // Replace common dictation symbols inside string literal
+    argument = argument
+      .replace(/\bcoma\b/gi, ",")
+      .replace(/\bpunto\b/gi, ".")
+      .replace(/\bdos\s+puntos\b/gi, ":")
+      .replace(/\bpunto\s+y\s+coma\b/gi, ";")
+      .replace(/\b(?:par.?ntesis?|parentesis?|parenthesis|paren|colon|igual|flecha|arrow)\b/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
 
-    return argument ? `printf("${this.normalizeStringLiteral(argument)}"):` : "printf()";
+    // Check for trailing "punto y coma" after closing quote to determine statement terminator
+    const afterQuotes = quoted ? normalized.slice((quoted.index ?? 0) + quoted[0].length).trim() : "";
+    const hasTerminator = /\b(punto\s+y\s+coma|semicolon)\b/i.test(afterQuotes);
+
+    if (!argument) return hasTerminator ? "printf();" : "printf()";
+    return `printf("${this.normalizeStringLiteral(argument)}")${hasTerminator ? ";" : ""}`;
   }
+
 
   private static normalizeSpokenCodeTokens(text: string): string {
     const span = this.extractCodeLikeSpan(text);
@@ -197,9 +267,13 @@ export class SpeechNormalizer {
 
     normalized = normalized
       .replace(/\s*([().,;:={}[\]"'])\s*/g, "$1")
+      .replace(/\.{2,}/g, (match) => match.length === 3 ? "..." : ".")
+      .replace(/;\)/g, ");")
+      .replace(/;\}/g, "};")
       .replace(/\s*=>\s*/g, " => ")
       .replace(/\s+/g, " ")
       .trim();
+
 
     return this.looksLikeCode(normalized) && !this.looksLikeProseCode(normalized) && !this.looksMalformedCode(normalized)
       ? normalized
@@ -212,8 +286,14 @@ export class SpeechNormalizer {
     const marker = normalized.search(markerPattern);
     if (marker < 0) return "";
 
-    let span = normalized.slice(marker).trim();
-    const boundary = span.search(/\b(?:bueno|okay|ok|despues|luego|me toca|estoy metiendo|si no me equivoco|eso es todo|chao|gracias)\b/i);
+    // Include context before the marker (up to 3 words or previous sentence boundary)
+    const before = normalized.slice(0, marker).trim();
+    const beforeWords = before.split(/\s+/).filter(Boolean);
+    const stopWords = /^(?:el|la|los|las|un|una|unos|unas|este|esta|estos|estas|y|o|que|de|del|en|al|por|para|con|sin|su|tu|mi|se|le|lo|la|no|si|me|te|es|fue|era|son|ser|hay|muy|mas|pero|como|cuando|donde|tiene|tengo|estoy|estas|esta|estamos|estan|estaba|estado|hacer|hace|hago|haciendo|voy|va|vas|vamos|van|iba|he|has|ha|han|habia|haber|puedo|puede|pueden|puedes|pueda|pudiera|sido|siendo|dice|dijo|dicen|dar|dio|dan|dando|dado|saber|sabe|sabes|saben|sabia|sabido|poner|pone|pones|ponen|puso|puesto|poniendo|tener|tenia|tenido|tiene|tienes|tienen|venir|viene|vienes|vienen|vino|venido|venir|sacar|saca|sacas|sacan|saco|sacado|sacar|dejar|deja|dejas|dejan|dejo|dejado|dejando|buscar|busca|buscas|buscan|busco|buscado|buscando)$/i;
+    const contextWords = beforeWords.slice(-3).filter(w => !stopWords.test(w));
+    let span = (contextWords.length ? contextWords.join(" ") + " " : "") + normalized.slice(marker).trim();
+
+    const boundary = span.search(/\b(?:bueno|okay|despues|luego|me toca|estoy metiendo|si no me equivoco|eso es todo|chao|gracias)\b/i);
     if (boundary > 0) span = span.slice(0, boundary).trim();
 
     const weakLead = span.match(/^(?:codigo|notas?|note)\b/i);
@@ -264,7 +344,7 @@ export class SpeechNormalizer {
 
   private static looksMalformedCode(value: string): boolean {
     const text = value.toLowerCase();
-    if (/^[=.)\]}]/.test(value.trim())) return true;
+    if (/^[=)\]}]/.test(value.trim())) return true;
     if (/====/.test(value)) return true;
     if (/\b(con|esta|ahi|aqui|bueno|okay|comisa|comida|icon|lane|ignor|ignot)\b/i.test(text) && !/[(){};]/.test(value)) {
       return true;

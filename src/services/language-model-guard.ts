@@ -234,7 +234,7 @@ export class LanguageModelGuard {
     }
     // .filter / filtrar
     if (/\b(filter|filtrar|filtros?)\b/i.test(normTranscript)) {
-      if (!normCode.includes(".filter")) {
+      if (!normCode.includes(".filter") && !normCode.includes("filt")) {
         mismatches.push("missing_filter_method");
       }
     }
@@ -263,22 +263,22 @@ export class LanguageModelGuard {
       return false;
     }
 
-    // Check 1: Unbalanced brackets/braces/parentheses using CodeAnalysis
+    // Structural issues that clearly need refinement
     if (CodeAnalysis.hasUnbalancedDelimiters(code)) return true;
-
-    // Check 2: Unbalanced quotes
     if (this.hasUnbalancedQuotes(code)) return true;
 
-    // Check 3: Explicit doubt or uncertainty in thought_tags
+    // Doubt keywords in thought_tags — model expressed uncertainty
     const doubtKeywords = ["duda", "dudas", "corregir", "incompleto", "interrumpido", "error", "ambiguo", "confuso"];
     if (doubtKeywords.some(keyword => tags.includes(keyword))) return true;
 
-    // Check 4: Spoken punctuation remains raw in the code (unified multilingual pattern for ES, EN, PT)
+    // Spoken punctuation remains raw in the code
     const rawPunctuationRegex = /\b(parentesis?|parenthesis|paren|comillas?|comisa|quotes?|llaves?|braces?|curly\s+braces?|corchetes?|brackets?|punto\s+y\s+coma|semicolon|signo\s+de\s+interrogacion|chaves?|colchetes?|ponto\s+e\s+virgula|igual(es)?|equals?|flecha|arrow)\b/i;
     if (rawPunctuationRegex.test(code)) return true;
 
-    // Check 5: Semantic mismatch between transcript and code
-    if (this.detectTranscriptCodeMismatch(transcript, code).length > 0) return true;
+    // Semantic transcript–code mismatch: only flag when code is empty/short
+    // (structural mismatches are already caught above; semantic-only mismatches
+    //  produce false positives when the model correctly omits constructs)
+    if (code.length < 20 && this.detectTranscriptCodeMismatch(transcript, code).length > 0) return true;
 
     return false;
   }

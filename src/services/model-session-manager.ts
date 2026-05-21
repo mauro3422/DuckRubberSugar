@@ -1,5 +1,5 @@
-import { AppConfig, ResponseContract } from "../config.js";
-import type { LanguageModelSession, SessionShape } from "../types.js";
+import { AppConfig, ResponseContract, JsonSchema, TranscriptionContract, TranscriptionSchema } from "../config.js";
+import type { LanguageModelContent, LanguageModelPrompt, LanguageModelSession, SessionShape } from "../types.js";
 
 // Declare global variable for LanguageModel to make TypeScript compiler happy
 declare const LanguageModel: any;
@@ -29,6 +29,13 @@ export class ModelSessionManager {
     return typeof this.baseSession.clone === "function" 
       ? await this.baseSession.clone() 
       : this.baseSession;
+  }
+
+  async resetBaseSession(): Promise<void> {
+    if (this.baseSession && typeof this.baseSession.destroy === "function") {
+      this.baseSession.destroy();
+    }
+    this.baseSession = null;
   }
 
   async initialize(
@@ -84,8 +91,9 @@ export class ModelSessionManager {
 
       this.baseSession = await lmAPI.create({
         ...sessionOptions,
-        temperature: 0.45,
+        temperature: 0.1,
         topK: 10,
+        responseConstraint: JsonSchema,
         initialPrompts: [{ role: "system", content: ResponseContract }],
         monitor(monitorTarget: EventTarget) {
           monitorTarget.addEventListener("downloadprogress", (event) => {
@@ -114,6 +122,43 @@ export class ModelSessionManager {
         throw error;
       }
     }
+  }
+
+  async createTemporarySession(
+    options: {
+      mode: "audio" | "text";
+      systemPrompt?: string;
+      responseConstraint?: unknown;
+    },
+  ): Promise<LanguageModelSession | null> {
+    let lmAPI = (window as any).LanguageModel;
+    if (!lmAPI && (window as any).ai && (window as any).ai.languageModel) {
+      lmAPI = (window as any).ai.languageModel;
+    }
+    if (!lmAPI) return null;
+
+    const sessionOptions = options.mode === "audio"
+      ? AppConfig.sessionOptions.audio
+      : AppConfig.sessionOptions.text;
+
+    const session = await lmAPI.create({
+      ...sessionOptions,
+      temperature: 0.1,
+      topK: 10,
+      ...(options.responseConstraint ? { responseConstraint: options.responseConstraint } : {}),
+      ...(options.systemPrompt ? { initialPrompts: [{ role: "system", content: options.systemPrompt }] } : {}),
+    });
+
+    return session as LanguageModelSession;
+  }
+
+  async appendToSession(
+    session: LanguageModelSession,
+    content: LanguageModelContent[],
+  ): Promise<void> {
+    if (typeof session.append !== "function") return;
+    const prompt: LanguageModelPrompt = [{ role: "user", content }];
+    await session.append(prompt);
   }
 
   shape(targetSession: LanguageModelSession | null = this.baseSession): SessionShape | null {

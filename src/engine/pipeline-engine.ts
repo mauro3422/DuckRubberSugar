@@ -1,5 +1,5 @@
 import { AppConfig } from "../config.js";
-import type { AudioAsset, EventLog, LanguageModelPrompt, PromptRun, RepairAttempt } from "../types.js";
+import type { AudioAsset, EventLog, LanguageModelContent, LanguageModelPrompt, LanguageModelSession, PromptRun, RepairAttempt } from "../types.js";
 import { BenchmarkService } from "../services/benchmark-service.js";
 import { StorageService } from "../services/storage-service.js";
 import { ReportService } from "../services/report-service.js";
@@ -10,6 +10,7 @@ import { JsonTools } from "../utils/json-tools.js";
 import { TokenEstimator } from "../utils/token-estimator.js";
 import { DefaultDataset } from "../data/default-dataset.js";
 import { audioBufferToWav } from "../utils/wav-encoder.js";
+import { TranscriptMerger } from "../utils/transcript-merger.js";
 
 export class PipelineEngine {
   readonly storage = new StorageService();
@@ -36,6 +37,20 @@ export class PipelineEngine {
   private audioTranscriptionPromise: Promise<void> | null = null;
   private audioTranscriptionRequestId = 0;
   private asrBridgeUrl: string | null = null;
+
+  private pipelineTrace: {
+    originalAsr: string;
+    correctedAsr: string;
+    audioPassConfidence?: number;
+    audioPassReasoning?: string;
+    audioPassRawResponse?: string;
+    mergeDiff?: string;
+    codeSketch: string;
+    codeNotes: string[];
+  } | null = null;
+
+  private streamingSession: LanguageModelSession | null = null;
+  private streamingAppendQueue: Promise<void> = Promise.resolve();
 
   constructor(private readonly store: AppStore) {}
 
@@ -81,6 +96,10 @@ export class PipelineEngine {
     }
   }
 
+  async resetModelSession(): Promise<void> {
+    await this.model.getSessionManager().resetBaseSession();
+  }
+
   async startRecording(delegate: import("../services/audio-service.js").AudioViewDelegate, lang = "es-AR"): Promise<void> {
     await this.initializeModel();
     if (!this.model.hasSession) return;
@@ -91,27 +110,89 @@ export class PipelineEngine {
     }
     this.audioTranscriptionRequestId += 1;
     this.audioTranscriptionPromise = null;
+    if (this.streamingSession) {
+      try { (this.streamingSession as any).destroy?.(); } catch {}
+      this.streamingSession = null;
+    }
+    this.streamingAppendQueue = Promise.resolve();
 
     try {
       this.store.update({ currentTestCase: null, expectedTranscript: "", manualTranscript: "" });
-      await this.audio.start(delegate, (type, data = {}) => this.log(type, data), lang);
+
+      // Clone session for streaming audio chunks during recording
+      const baseSession = this.model.getSessionManager().getBaseSession();
+      if (baseSession && typeof baseSession.clone === "function") {
+        this.streamingSession = await baseSession.clone();
+        this.log("streaming-session-created", {});
+      }
+
+      const streamingDelegate: import("../services/audio-service.js").AudioViewDelegate = {
+        ...delegate,
+        onAudioProgress: (partialBlob: Blob, elapsedMs: number) => {
+          if (!this.streamingSession) return;
+          this.streamingAppendQueue = this.streamingAppendQueue.then(async () => {
+            try {
+              const content: LanguageModelContent[] = [
+                { type: "audio", value: partialBlob },
+                { type: "text", value: `[Audio chunk at ${elapsedMs}ms — continue listening]` },
+              ];
+              const prompt: LanguageModelPrompt = [{ role: "user", content }];
+              if (typeof (this.streamingSession as any).append === "function") {
+                await (this.streamingSession as any).append(prompt);
+                this.log("streaming-chunk-appended", { elapsedMs, size: partialBlob.size });
+              }
+            } catch (err) {
+              this.log("streaming-chunk-error", { elapsedMs, error: (err as Error).message });
+            }
+          });
+        },
+      };
+
+      await this.audio.start(streamingDelegate, (type, data = {}) => this.log(type, data), lang);
     } catch (error) {
       this.store.update({ audioStateText: "No se pudo usar el microfono" });
       this.log("recording-error", { message: (error as Error).message, stack: (error as Error).stack });
     }
   }
 
-  stopRecording(): void {
+  async stopRecording(): Promise<void> {
     this.audio.stop((type, data = {}) => this.log(type, data));
+
+    // Wait for any in-flight streaming appends to complete
+    await this.streamingAppendQueue;
+    this.log("streaming-queue-drained", { sessionAlive: Boolean(this.streamingSession) });
+    
     this.store.update({
-      audioStateText: "Procesando audio...",
-      expectedTranscript: "",
-      manualTranscript: "",
+      audioStateText: "Finalizando transcripción...",
       isTranscribingAudio: true,
     });
-    this.setStatus("Transcribiendo grabacion con Google ASR...");
-    void this.transcribeRecordedAudio();
+    this.setStatus("Esperando transcripción final en vivo...");
+
+    const liveTranscript = await this.audio.waitForRecognitionFinished(2000) || "";
+    if (liveTranscript.trim().length > 0) {
+      // Use the live SpeechRecognition transcript directly, avoiding slow redundant re-transcription!
+      this.store.update({
+        audioStateText: "Grabacion lista (Live transcript)",
+        manualTranscript: liveTranscript,
+        manualTranscriptEs: liveTranscript,
+        manualTranscriptEn: "",
+        isTranscribingAudio: false,
+      });
+      this.log("recording-live-transcribed", { chars: liveTranscript.length });
+      this.startTypingAnimation(liveTranscript, "Transcripción en vivo lista");
+    } else {
+      // Fallback: If live transcript is empty/silent, probe Python ASR
+      this.store.update({
+        audioStateText: "Procesando audio...",
+        expectedTranscript: "",
+        manualTranscript: "",
+        isTranscribingAudio: true,
+      });
+      this.setStatus("Transcribiendo grabacion con Google ASR...");
+      await this.transcribeRecordedAudio();
+    }
   }
+
 
   private async transcribeRecordedAudio(): Promise<void> {
     const requestId = ++this.audioTranscriptionRequestId;
@@ -120,11 +201,16 @@ export class PipelineEngine {
         if (requestId !== this.audioTranscriptionRequestId) return;
         if (!asset?.blob) throw new Error("No hay audio grabado para transcribir");
         const file = new File([asset.blob], "grabacion.webm", { type: asset.blob.type || "audio/webm" });
-        const transcript = await this.transcribeAudioFile(file);
+        const result = await this.transcribeAudioFile(file);
         if (requestId !== this.audioTranscriptionRequestId) return;
-        this.store.update({ audioStateText: "Grabacion lista e indexada con ASR", manualTranscript: transcript });
-        this.log("recording-transcribed", { chars: transcript.length });
-        this.startTypingAnimation(transcript);
+        this.store.update({
+          audioStateText: "Grabacion lista e indexada con ASR",
+          manualTranscript: result.transcript,
+          manualTranscriptEs: result.transcriptEs,
+          manualTranscriptEn: result.transcriptEn,
+        });
+        this.log("recording-transcribed", { chars: result.transcript.length });
+        this.startTypingAnimation(result.transcript);
       })
       .catch((error) => {
         if (requestId !== this.audioTranscriptionRequestId) return;
@@ -169,11 +255,16 @@ export class PipelineEngine {
     const transcriptionRequestId = ++this.audioTranscriptionRequestId;
     
     this.audioTranscriptionPromise = this.transcribeAudioFile(file)
-      .then((transcript) => {
+      .then((result) => {
         if (transcriptionRequestId !== this.audioTranscriptionRequestId) return;
-        this.store.update({ audioStateText: `Audio listo e indexado con ASR`, manualTranscript: transcript });
-        this.log("audio-file-transcribed", { name: file.name, chars: transcript.length });
-        this.startTypingAnimation(transcript);
+        this.store.update({
+          audioStateText: `Audio listo e indexado con ASR`,
+          manualTranscript: result.transcript,
+          manualTranscriptEs: result.transcriptEs,
+          manualTranscriptEn: result.transcriptEn,
+        });
+        this.log("audio-file-transcribed", { name: file.name, chars: result.transcript.length });
+        this.startTypingAnimation(result.transcript);
       })
       .catch((error) => {
         if (transcriptionRequestId !== this.audioTranscriptionRequestId) return;
@@ -239,7 +330,7 @@ export class PipelineEngine {
     }, interval);
   }
 
-  async transcribeAudioFile(file: File): Promise<string> {
+  async transcribeAudioFile(file: File): Promise<{ transcript: string; transcriptEs?: string; transcriptEn?: string }> {
     const asrBridgeUrl = await this.resolveDuckSugarAsrBridge();
 
     const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
@@ -268,7 +359,11 @@ export class PipelineEngine {
         throw new Error(data.error || "Error de transcripción desconocido");
       }
       
-      return data.transcript;
+      return {
+        transcript: data.transcript || "",
+        transcriptEs: data.transcript_es || "",
+        transcriptEn: data.transcript_en || "",
+      };
     } finally {
       await context.close().catch(() => undefined);
     }
@@ -377,6 +472,7 @@ export class PipelineEngine {
 
   async sendAudio(instructionText: string, useStreaming: boolean, onChunk: (text: string) => void, langSelectCode?: string): Promise<boolean> {
     const startedAt = performance.now();
+    this.pipelineTrace = null;
     let asset = this.audio.asset;
     if (!asset) {
       this.setStatus("Sin audio", "bad");
@@ -431,6 +527,54 @@ export class PipelineEngine {
       return false;
     }
 
+    // Skip Audio Pass for long audio (>20s) — Main Pass hears audio directly, timeout wastes time
+    const skipAudioPass = (asset.durationMs ?? 0) > 20000;
+    let modelTranscription: any = null;
+    if (skipAudioPass) {
+      this.log("audio-transcription-skip", { reason: "audio-longer-than-20s", durationMs: asset.durationMs });
+    } else {
+      this.setStatus("Ajustando transcripcion ASR...");
+      modelTranscription = await this.model.runAudioTranscription({
+        audioBlob: asset.blob,
+        asrTranscript: transcription,
+        audioDurationMs: asset.durationMs,
+      });
+    }
+
+    let correctedTranscript = transcription;
+    const originalAsr = transcription;
+    let mergeDiff: string | undefined;
+    if (!modelTranscription) {
+      this.log("audio-transcription-skip", { reason: "no-result-from-model" });
+    } else if (modelTranscription.error) {
+      this.log("audio-transcription-skip", { reason: modelTranscription.error });
+    } else if (!modelTranscription.transcript) {
+      this.log("audio-transcription-skip", { reason: "empty-transcript" });
+    } else {
+      this.log("audio-transcription-result", {
+        correctionsCount: modelTranscription.phonetic_corrections?.length ?? 0,
+        confidences: modelTranscription.phonetic_corrections?.map((c: any) => c.confidence ?? c),
+        transcriptLength: modelTranscription.transcript.length,
+        confidence: modelTranscription.confidence,
+        reasoning: modelTranscription.reasoning?.slice(0, 200),
+        rawResponse: modelTranscription.rawResponse,
+      });
+      const merger = new TranscriptMerger();
+      const mergeResult = merger.merge(transcription, modelTranscription);
+      correctedTranscript = mergeResult.transcript;
+      if (mergeResult.correctionsApplied.length > 0) {
+        this.log("audio-transcription-merged", {
+          before: transcription,
+          after: correctedTranscript,
+          correctionsApplied: mergeResult.correctionsApplied,
+        });
+        mergeDiff = mergeResult.correctionsApplied.join(" | ");
+      }
+    }
+
+    // Use corrected transcript from here on
+    transcription = correctedTranscript;
+
     // Duck Empathy Engine: Calculate WPM, volume dynamics, pause ratio
     const durationMs = asset.durationMs || this.audio.recordedDurationMs || 1000;
     const durationSeconds = durationMs / 1000;
@@ -479,7 +623,7 @@ export class PipelineEngine {
       detectedEmpathyMood: detectedMood,
       empathyWpm: wpm,
     });
-    this.setStatus("Consultando modelo...");
+    this.setStatus("Modelo escuchando y analizando audio...");
 
     const contextHint = state.currentTestCase?.contextHint?.trim();
     
@@ -489,17 +633,48 @@ export class PipelineEngine {
     const codeSketch = SpeechNormalizer.inferCodeFromSpeech(transcription, contextHint);
     const codeNotes = SpeechNormalizer.buildCodeNotes(transcription, contextHint);
 
+    // Save pipeline trace for display in AcoCoT card
+    this.pipelineTrace = {
+      originalAsr,
+      correctedAsr: transcription,
+      audioPassConfidence: modelTranscription?.confidence,
+      audioPassReasoning: modelTranscription?.reasoning,
+      audioPassRawResponse: modelTranscription?.rawResponse,
+      mergeDiff,
+      codeSketch: codeSketch.code,
+      codeNotes,
+    };
+    console.log("[Pipeline Trace]", {
+      originalAsr,
+      correctedAsr: transcription,
+      mergeDiff,
+      audioPassConfidence: modelTranscription?.confidence,
+      audioPassReasoning: modelTranscription?.reasoning?.slice(0, 200),
+      audioPassRawResponse: modelTranscription?.rawResponse,
+      codeSketch: codeSketch.code,
+      codeNotes,
+    });
+    this.log("pipeline-trace", {
+      originalAsr,
+      correctedAsr: transcription,
+      mergeDiff,
+      audioPassConfidence: modelTranscription?.confidence,
+      audioPassReasoning: modelTranscription?.reasoning?.slice(0, 200),
+      codeSketch: codeSketch.code,
+      codeNotes,
+    });
+
     let codeSketchBlock = "";
     if (codeDetected) {
       codeSketchBlock = [
-        "[CODE DETECTED] The ASR transcript contains code identifiers and/or spoken punctuation. You MUST generate the reconstructed code inside <code>.",
+        "[CODE DETECTED] The ASR transcript contains code identifiers and/or spoken punctuation. You MUST generate the reconstructed code in the \"code\" field.",
         codeSketch.code
           ? `[CODE SKETCH] Possible code inferred from speech:\n${codeSketch.code}\n[END CODE SKETCH]\nUse this as a starting point, verify and improve the syntax.`
           : "[CODE SKETCH] No reliable sketch could be inferred, but code patterns were detected in the transcript. Analyze the transcript carefully and reconstruct the code.",
         codeNotes.length
           ? `[CODE NOTES]\n${codeNotes.map((note) => `- ${note}`).join("\n")}\n[END CODE NOTES]`
           : "",
-        "CRITICAL: Empty <code> when code identifiers are detected in the transcript is a FAILURE. You MUST output reconstructed code inside <code>.</code>"
+        "CRITICAL: Empty \"code\" field when code identifiers are detected in the transcript is a FAILURE. You MUST output reconstructed code in the \"code\" field."
       ].filter(Boolean).join("\n\n");
     } else if (codeSketch.code) {
       codeSketchBlock = [
@@ -525,12 +700,38 @@ export class PipelineEngine {
       /^(hola|cómo|como|estás|estas|necesito|bueno|tengo|pregunta|por|qué|que|cuando|donde|después|despues|mencionaste|correcciones|notas)/i.test(transcription);
     const responseLanguage = isSpanish ? "Spanish" : "English";
 
+    let asrBlock = `[AUDIO TRANSCRIBED BY ASR]: ${transcription}`;
+    if (state.manualTranscriptEs || state.manualTranscriptEn) {
+      asrBlock = [
+        "[AUDIO TRANSCRIBED BY ASR]:",
+        state.manualTranscriptEs ? `- Spanish ASR (es-AR): ${state.manualTranscriptEs.trim()}` : "",
+        state.manualTranscriptEn ? `- English ASR (en-US): ${state.manualTranscriptEn.trim()}` : "",
+        `- Primary / Combined: ${transcription}`
+      ].filter(Boolean).join("\n");
+    }
+
+    // Wait for streaming appends to finish before preparing prompt
+    const hasStreamingAudio = Boolean(this.streamingSession);
+    if (hasStreamingAudio) {
+      await this.streamingAppendQueue;
+      this.log("streaming-ready", {});
+    }
+
+    const audioContent: LanguageModelContent[] = hasStreamingAudio
+      ? []
+      : [{ type: "audio" as const, value: asset.blob }];
+
+    const audioInstruction = hasStreamingAudio
+      ? "[STREAMING AUDIO] Audio was streamed during recording and is already in the session context. The ASR transcript below is your base text — verify it against what you heard."
+      : "[AUDIO + ASR] The audio is attached above. Read the ASR transcript below as your base text — it's the primary transcription. Listen to the audio to verify: if the ASR misheard something (e.g., 'comisa' instead of 'comilla', 'Sprint F' instead of 'printf'), correct it. Think of it as reading a draft while someone dictates: you read, you hear, you catch mismatches.";
+
     const prompt: LanguageModelPrompt = [
       {
         role: "user",
         content: [
-          { type: "text", value: `[Acoustic State: ${detectedMood}] [Response Language: ${responseLanguage}] (Speech Pace: ${wpm} WPM, Volume Dynamics: ${volumeStdDev.toFixed(3)}, Pause Ratio: ${(pauseRatio * 100).toFixed(1)}%)\n\n${textContent}` },
-          { type: "text", value: `[AUDIO TRANSCRIBED BY ASR]: ${transcription}` },
+          ...audioContent,
+          { type: "text", value: `[Acoustic State: ${detectedMood}] [Audio Attached — listen to audio alongside ASR] [Response Language: ${responseLanguage}] (Speech Pace: ${wpm} WPM, Volume Dynamics: ${volumeStdDev.toFixed(3)}, Pause Ratio: ${(pauseRatio * 100).toFixed(1)}%)\n\n${audioInstruction}\n\n${textContent}` },
+          { type: "text", value: asrBlock },
         ],
       },
     ];
@@ -563,6 +764,8 @@ export class PipelineEngine {
       contextHint: contextHint ? { testCaseId: state.currentTestCase?.id, chars: contextHint.length } : null,
       codeSketchProvided: Boolean(codeSketch.code),
       codeNotes,
+      audioInPrompt: !hasStreamingAudio,
+      streamingAudio: hasStreamingAudio,
     });
 
     try {
@@ -578,6 +781,7 @@ export class PipelineEngine {
         sourceTranscript: transcription,
         localCodeSketch: codeSketch.code,
         localCodeTags: codeSketch.tags,
+        existingSession: this.streamingSession ?? undefined,
       });
       this.finishRun(asset, run);
       return true;
@@ -590,6 +794,7 @@ export class PipelineEngine {
       return false;
     } finally {
       this.store.update({ isPromptRunning: false });
+      this.streamingSession = null; // destroyed by runAudioPrompt's finally block
     }
   }
 
@@ -667,7 +872,30 @@ export class PipelineEngine {
     const outputEstimate = TokenEstimator.estimate(run.response);
     const generationWindowMs = run.firstPass.firstChunkMs === null ? elapsedMs : Math.max(1, elapsedMs - run.firstPass.firstChunkMs);
 
-    const parsed = JsonTools.extractResponse(run.response);
+    const parsed = JsonTools.extractResponse(run.response) ?? {};
+    if (parsed && this.pipelineTrace) {
+      const trace = this.pipelineTrace;
+      const parts: string[] = ["━━━ Pipeline Trace ━━━"];
+      if (trace.mergeDiff) {
+        parts.push(`[Merge] ${trace.mergeDiff}`);
+      }
+      if (trace.audioPassConfidence !== undefined) {
+        parts.push(`[Audio Pass] confidence: ${trace.audioPassConfidence}, reasoning: ${(trace.audioPassReasoning ?? "").slice(0, 150)}`);
+      }
+      if (trace.audioPassRawResponse) {
+        const raw = trace.audioPassRawResponse.length > 200 ? trace.audioPassRawResponse.slice(0, 200) + "..." : trace.audioPassRawResponse;
+        parts.push(`[Audio Raw] ${raw}`);
+      }
+      if (trace.codeSketch) {
+        parts.push(`[SpeechNormalizer] code sketch: ${trace.codeSketch}`);
+      }
+      if (trace.codeNotes.length) {
+        parts.push(`[Code Notes] ${trace.codeNotes.join("; ")}`);
+      }
+      parsed.pipeline_trace = parts.join("\n");
+    }
+    this.pipelineTrace = null;
+
     const contentText = [parsed?.transcript, parsed?.code, parsed?.answer].filter(Boolean).join(" ");
     const contentEstimate = TokenEstimator.estimate(contentText);
 

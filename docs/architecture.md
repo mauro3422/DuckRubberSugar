@@ -1,145 +1,184 @@
 # DuckSugar Architecture
 
-DuckSugar is a browser-first local voice assistant for developer workflows. It is built around one constraint: Google ASR returns text, not code. Code understanding is therefore handled after transcription by local preanalysis plus the browser model.
+DuckSugar is a browser-first local voice assistant for developer workflows. It uses a **layered pipeline** where the model hears the audio directly, ASR is just reference, and WCL + SpeechNormalizer act as post-hoc safety nets.
 
 ## Pipeline
 
 ```text
 Audio input
-  -> AudioService
-  -> ASR bridge discovery via /health
-  -> transcribe_server.py /transcribe
-  -> Google ASR transcript
-  -> SpeechNormalizer preanalysis
-  -> Prompt header + transcript + context
-  -> Chrome LanguageModel session
-  -> XML response
+  -> AudioService (startRecording — MediaRecorder.start(1000) for ~1s chunks)
+     -> onAudioProgress callback each chunk
+     -> [streaming] session.append(partialBlob) — audio accumulated during recording
+  -> ASR bridge (transcribe_server.py /transcribe)
+  -> Google ASR transcript (raw text)
+  -> [1] Audio Pass — model listens to audio + ASR, outputs corrections (optional; timeout doesn't block)
+  -> [2] Word Correction Layer (WCL) — applies corrections per-word to ASR (optional)
+  -> [3] SpeechNormalizer preanalysis (code sketch + notes) (optional)
+  -> [4] Main Pass — uses streaming session if available, else clones fresh + attaches audio blob
   -> JsonTools parser
   -> DialogueAnalyzer metadata
   -> Benchmark/report storage
 ```
 
-## Core Components
+ASR is the base text. Audio is the verification channel. The model reads the ASR like a draft, then listens to audio like a proofreader: "this word doesn't match what I hear → correct it".
 
-### Browser App
+Priority: **model's final output > WCL corrections > ASR raw > SpeechNormalizer
 
-- `src/app.ts`: app bootstrap.
-- `src/store/app-store.ts`: reactive app state.
-- `src/view/*`: UI panels.
-- `src/engine/pipeline-engine.ts`: main orchestration.
+---
 
-### Audio and ASR
+## [1] Audio Pass (WCL feeder)
 
-- `src/services/audio-service.ts`: recording, file loading, duration, and volume metrics.
-- `src/utils/wav-encoder.ts`: browser-side WAV conversion.
-- `transcribe_server.py`: static server plus Google ASR endpoint.
+**File:** `src/services/language-model-service.ts:44-136` (`runAudioTranscription`)
 
-The app intentionally blocks new file runs when no ASR transcript is available. Dataset transcripts are not used as fallbacks. Chrome Nano is not used as a raw audio transcriber in the current flow.
+The model listens to the actual audio alongside the ASR transcript and outputs JSON with per-word corrections:
 
-The ASR bridge can run same-origin with the app or on a separate local port. `PipelineEngine` probes `/health` on the current origin and known local bridge ports before sending audio to `/transcribe`. This avoids the corrupted benchmark case where VS Code Live Server owns `5500` and returns `405 Method Not Allowed` for `POST /transcribe`.
+```typescript
+{
+  transcript: string;                        // full corrected transcript
+  phonetic_corrections: PhoneticCorrection[]; // word-level corrections
+  confidence: number;                        // 0-1 global confidence
+  reasoning: string;                         // why corrections were made
+}
+```
 
-`npm run dev` is the intended single-command development entrypoint. It runs TypeScript in watch mode and starts the Python static/ASR server. If `5500` is unavailable, the server chooses the next configured local port and the browser can still find it through `/health`.
+Uses `TranscriptionSchema` as `responseConstraint`. Still runs but its timeout no longer blocks the pipeline — the Main Pass hears audio regardless.
 
-Valid benchmark preconditions:
+---
 
-- `/health` identifies `service: "ducksugar"` and `asr: "google"`;
-- the event log includes `asr-bridge-selected`;
-- the file load emits `audio-file-transcribed`;
-- no dataset transcript fallback is present.
+## [2] Word Correction Layer (WCL)
 
-Benchmark audio is loaded from `pruebas/` by the browser. The benchmark loop must use the same file-loading path as a user-selected audio file: fetch audio, decode/convert to WAV, call `/transcribe`, then prompt the model with the Google ASR transcript.
+**File:** `src/utils/transcript-merger.ts` (`TranscriptMerger`)
 
-### Local Preanalysis
+Applies corrections surgically — one word at a time, per-correction confidence. Operates on the raw ASR transcript, not the model output.
 
-- `src/utils/universal-grammar.ts`: multilingual spoken programming grammar.
-- `src/utils/speech-normalizer.ts`: code detection, symbol normalization, and context lexicon recovery.
+See `transcript-merger.ts` for full logic.
 
-Preanalysis produces:
+---
 
-- `codeDetected`: whether the transcript likely contains code.
-- `codeSketch`: best-effort probable code when local evidence is strong.
-- `codeNotes`: compact identifiers/operators/uncertainty notes for the model.
+## [3] SpeechNormalizer (preanalysis)
 
-Example:
+**File:** `src/utils/speech-normalizer.ts`
+
+Heuristic preanalysis on the corrected ASR. Extracts:
+- `codeSketch` — partial inferred code (printf calls, if-conditions, etc.)
+- `codeNotes` — identifiers and actions mentioned in speech
+
+**Now optional** — the Main Pass hears audio directly. SpeechNormalizer is a fallback hint, not a requirement.
+
+---
+
+## [4] Main Pass (text + audio)
+
+**File:** `src/engine/pipeline-engine.ts:700-726` (`sendAudio` → `runAudioPrompt`)
+
+The Main Pass receives audio in one of two ways:
+
+### Streaming path (live recording)
+```
+[streaming session]  ← audio chunks appended during recording via session.append()
+[Acoustic State + instructions]
+[Corrected ASR transcript]  ← from WCL
+[codeSketch + codeNotes]    ← from SpeechNormalizer (optional)
+[Context hint (IDE/RAG)]
+```
+
+### Non-streaming path (benchmark / file load)
+```
+[Audio blob]  ← attached to prompt inline
+[Acoustic State + instructions]
+[Corrected ASR transcript]  ← from WCL
+[codeSketch + codeNotes]    ← from SpeechNormalizer (optional)
+[Context hint (IDE/RAG)]
+```
+
+The model:
+1. **Reads the ASR transcript** (base text, primary transcription)
+2. **Hears the audio** (verification channel — either streamed or attached)
+3. **Compares** both: "ASR says X, audio sounds like Y → correct"
+4. **Produces** final code + transcript + answer
+
+**Why this matters:**
+- Before: Audio Pass cloned once to hear audio → Text Pass cloned again with only text → if Audio Pass timed out, Text Pass was blind
+- After: Audio Pass still runs for WCL corrections, but Main Pass always gets audio regardless of Audio Pass timeout
+- Streaming: audio is being processed by the model during recording, reducing post-recording latency
+
+---
+
+## Streaming Audio
+
+**File:** `src/engine/pipeline-engine.ts:99-183` (`startRecording` / `stopRecording`)
+
+During live recording, audio chunks are streamed to the model incrementally:
+
+1. `startRecording()` clones a dedicated **streaming session** from the base session
+2. `MediaRecorder.start(1000)` fires `dataavailable` every ~1s during recording
+3. Each partial blob is emitted via `AudioViewDelegate.onAudioProgress`
+4. `PipelineEngine` receives the callback and calls `session.append(partialBlob)` sequentially
+5. A promise chain (`streamingAppendQueue`) ensures chunks are processed in order without races
+6. When the user stops recording and sends, `sendAudio` awaits the queue to drain, then passes the accumulated session to `runAudioPrompt` as `existingSession`
+7. `runAudioPrompt` uses this session instead of cloning a fresh one — the model already has the audio in context
+8. The session is destroyed by `runAudioPrompt`'s cleanup after the prompt completes
+
+### Why streaming matters
+- Audio is being processed (or at least ingested) during recording, not after
+- Reduces the gap between "user stops speaking" and "model responds"
+- The full-blob attach fallback is used for benchmark/file-load paths
+
+---
 
 ```text
-[CODE DETECTED]
-[CODE SKETCH]
-noteList.innerHTML = notasFiltradas.map(...)
-[CODE NOTES]
-- identifiers: noteList, notasFiltradas, noteCount
-- operators: = => === .
-- uncertain: node/note list likely noteList
+User says:  "printf paréntesis comilla Hola mundo comilla punto y coma"
+
+ASR hears:  "printf paréntesis con mi yaola mundo con Isa punto y coma"
+                                         ↑ errors
+
+[1] Audio Pass: escucha audio + ASR
+  → phonetic_corrections: [{original: "yaola", corrected: "hola", confidence: 0.95}]
+  → confidence: 0.92
+
+[2] WCL: aplica correcciones al ASR:
+  "printf paréntesis comilla hola mundo con Isa punto y coma"
+  Note: "con Isa" no se corrije (confianza baja o no detectado)
+
+[3] SpeechNormalizer: infiere printf call
+  → code sketch: printf("Hola mundo")
+
+[4] Main Pass: recibe audio + ASR corregido + code sketch
+  Modelo escucha audio → oye "comilla" correctamente
+  → corrige "comilla" y produce código final
+  → output: printf("Hola mundo");
+
+Result: printf("Hola mundo");
 ```
 
-## Dynamic IDE/RAG Lexicon
+---
 
-Project-specific names must not live in a global hardcoded dictionary. They come from context.
+## Error Recovery
 
-Current source:
+| Failure | Effect | Recovery |
+|---|---|---|
+| Audio Pass timeout | No WCL corrections | Main Pass hears audio directly — no data loss |
+| SpeechNormalizer empty sketch | No code hint | Main Pass hears audio + reads ASR — no data loss |
+| Main Pass hears audio only | No ASR text | Model transcribes from scratch (worst case) |
 
-```xml
-<ide_context>
-identificadores_visibles: noteList, notasFiltradas, nota, noteActiveId, activeClass, noteCount
-tokens_visibles: innerHTML, map, const, id, active, if, textContent, length, notas
-</ide_context>
-```
+The pipeline is **resilient to any single layer failing** because the Main Pass always has the audio.
 
-Future source:
+---
 
-```text
-RAG / editor connector -> visible symbols -> nearby code -> file/project vocabulary
-```
+## Key Design Decisions
 
-The normalizer can then resolve ASR variants such as:
-
-- `node list.net html` -> `noteList.innerHTML`
-- `nota filtradas punto maps` -> `notasFiltradas.map`
-- `notes.com text content` -> `noteCount.textContent`
-
-This is contextual recovery, not a universal Spanish dictionary.
-
-## Model Contract
-
-The model must return XML:
-
-```xml
-<response>
-  <think></think>
-  <tags></tags>
-  <transcript></transcript>
-  <code></code>
-  <answer></answer>
-  <directed></directed>
-  <lang></lang>
-  <needs_context></needs_context>
-  <phonetic_corrections></phonetic_corrections>
-</response>
-```
-
-Important constraints:
-
-- `<think>` is short and in English.
-- `<answer>` is concise, max 20 words.
-- `<code>` is mandatory when `[CODE DETECTED]` is present.
-- `<code>` must contain raw code only, not nested XML or correction tags.
+| Decision | Rationale |
+|---|---|
+| Audio in Main Pass, not just Audio Pass | Eliminates blind-Text-Pass problem; model hears once |
+| Streaming via append() during recording | Audio processed incrementally; reduces post-recording latency |
+| Streaming session reused for Main Pass | No second clone; accumulated audio context preserved |
+| WCL still runs on ASR | Catches predictable ASR errors before Main Pass |
+| SpeechNormalizer is optional | Heuristics can't beat the model hearing audio directly |
+| ASR is reference, not source of truth | Audio is the source; ASR is a draft |
 
 ## Repair Passes
 
 `LanguageModelService` may trigger extra passes:
-
 - `asr_text_retry`: first pass missed transcript/code despite ASR text.
-- `json_repair`: XML shape is invalid.
+- `json_repair`: XML/JSON shape is invalid.
 - `self_refinement`: code contains raw spoken punctuation, unbalanced delimiters, or semantic mismatch.
-
-Repair is useful but expensive. Benchmark reports track whether it improves the score.
-
-## Current Design Tradeoff
-
-The system deliberately avoids a single massive regex/dictionary layer. Instead:
-
-1. Universal grammar handles stable syntax.
-2. IDE/RAG context supplies real project names.
-3. The model resolves intent and produces the final user-facing answer.
-
-This is the path that scales beyond the three benchmark examples.

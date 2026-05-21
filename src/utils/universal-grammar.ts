@@ -29,7 +29,9 @@ export enum UniversalToken {
   ARRAY_FILTER = "ARRAY_FILTER",
   DOM_HTML = "DOM_HTML",
   DOM_TEXT = "DOM_TEXT",
-  PRINT = "PRINT"
+  PRINT = "PRINT",
+  DOLLAR = "DOLLAR",
+  PLUS = "PLUS"
 }
 
 export type LanguageTarget = "typescript" | "python" | "csharp" | "rust" | "go";
@@ -59,6 +61,12 @@ export class UniversalGrammar {
 
     // Arrow / Lambda functions
     { token: UniversalToken.LAMBDA, regex: /\b(flecha|arrow\s+function|arrow|lambda)\b/i },
+
+    // Math Operators
+    { token: UniversalToken.PLUS, regex: /\b(más|mas|plus)\b/i },
+
+    // Dollar / Interpolation
+    { token: UniversalToken.DOLLAR, regex: /\b(signo\s+pesos?|signo\s+dolar|signo\s+dólar|dolar|dólar|pesos)\b/i },
 
     // Quotes
     { token: UniversalToken.STRING_LITERAL, regex: /\b(comillas?|comisa|quotes?|aspas)\b/i },
@@ -133,11 +141,13 @@ export class UniversalGrammar {
       case UniversalToken.BRACKET_OPEN: return "[";
       case UniversalToken.BRACKET_CLOSE: return "]";
       case UniversalToken.STRING_LITERAL: return "'";
-      case UniversalToken.ARRAY_MAP: return ".map(";
-      case UniversalToken.ARRAY_FILTER: return ".filter(";
+      case UniversalToken.ARRAY_MAP: return ".map";
+      case UniversalToken.ARRAY_FILTER: return ".filter";
       case UniversalToken.DOM_HTML: return ".innerHTML";
       case UniversalToken.DOM_TEXT: return ".textContent";
-      case UniversalToken.PRINT: return "console.log(";
+      case UniversalToken.PRINT: return "console.log";
+      case UniversalToken.DOLLAR: return "$";
+      case UniversalToken.PLUS: return "+";
       default: return "";
     }
   }
@@ -161,6 +171,7 @@ export class UniversalGrammar {
       case UniversalToken.ARRAY_MAP: return "map(";
       case UniversalToken.ARRAY_FILTER: return "filter(";
       case UniversalToken.PRINT: return "print(";
+      case UniversalToken.DOLLAR: return "$";
       default: return "";
     }
   }
@@ -184,6 +195,7 @@ export class UniversalGrammar {
       case UniversalToken.ARRAY_MAP: return ".Select(";
       case UniversalToken.ARRAY_FILTER: return ".Where(";
       case UniversalToken.PRINT: return "Console.WriteLine(";
+      case UniversalToken.DOLLAR: return "$";
       default: return "";
     }
   }
@@ -207,6 +219,7 @@ export class UniversalGrammar {
       case UniversalToken.ARRAY_MAP: return ".map(";
       case UniversalToken.ARRAY_FILTER: return ".filter(";
       case UniversalToken.PRINT: return "println!(";
+      case UniversalToken.DOLLAR: return "$";
       default: return "";
     }
   }
@@ -227,6 +240,7 @@ export class UniversalGrammar {
       case UniversalToken.BRACKET_CLOSE: return "]";
       case UniversalToken.STRING_LITERAL: return '"';
       case UniversalToken.PRINT: return "fmt.Println(";
+      case UniversalToken.DOLLAR: return "$";
       default: return "";
     }
   }
