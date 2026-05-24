@@ -1,10 +1,12 @@
-import { AppConfig, TranscriptionSchema } from "../config.js";
+import { AppConfig, TranscriptionSchema, TranscriptionContract } from "../config.js";
 import type { LanguageModelPrompt, LanguageModelSession, PromptRun, RepairAttempt, SessionShape } from "../types.js";
 import { JsonTools } from "../utils/json-tools.js";
 import { LanguageModelGuard } from "./language-model-guard.js";
 import { ModelSessionManager } from "./model-session-manager.js";
 import { PromptExecutor } from "./prompt-executor.js";
 import { ModelRepairEngine } from "./model-repair-engine.js";
+import { RepairPipeline } from "./repair-pipeline.js";
+import type { RepairContext } from "./repair-pipeline.js";
 import type { ModelTranscription } from "../utils/transcript-merger.js";
 
 export class LanguageModelService {
@@ -50,23 +52,22 @@ export class LanguageModelService {
     asrTranscript: string;
     audioDurationMs: number | null;
   }): Promise<ModelTranscription | null> {
-    const baseSession = this.sessionManager.getBaseSession();
-    if (!baseSession) return null;
-
     let runSession: LanguageModelSession | null = null;
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          runSession = typeof baseSession.clone === "function"
-            ? await baseSession.clone()
-            : baseSession;
-          break;
+          runSession = await this.sessionManager.createTemporarySession({
+            mode: this.sessionMode === "audio" ? "audio" : "text",
+            systemPrompt: TranscriptionContract,
+            responseConstraint: TranscriptionSchema
+          });
+          if (runSession) break;
         } catch (e) {
           if (attempt === 0) await new Promise(r => setTimeout(r, 500));
           else throw e;
         }
       }
-      if (!runSession) return { transcript: "", error: "failed to clone session after retry" };
+      if (!runSession) return { transcript: "", error: "failed to create temporary transcription session after retry" };
 
       const prompt: LanguageModelPrompt = [{
         role: "user",
@@ -138,7 +139,7 @@ export class LanguageModelService {
     } catch (error) {
       return { transcript: "", error: `exception: ${(error as Error).message?.slice(0, 200) ?? "unknown"}` };
     } finally {
-      if (runSession && runSession !== baseSession && typeof runSession.destroy === "function") {
+      if (runSession && typeof runSession.destroy === "function") {
         try { runSession.destroy(); } catch { /* ignore */ }
       }
     }
@@ -169,136 +170,74 @@ export class LanguageModelService {
     const runSession = args.existingSession
       ?? (typeof baseSession.clone === "function" ? await baseSession.clone() : baseSession);
 
+    const promptToUse = this.sessionMode === "text"
+      ? args.prompt.map(item => ({
+          ...item,
+          content: item.content.filter(c => c.type !== "audio")
+        }))
+      : args.prompt;
+
     try {
-      const contextUsage = await this.executor.measureContextUsage(runSession, args.prompt);
-      const firstPass = await this.executor.runPrompt(runSession, args.prompt, args.useStreaming, args.onChunk);
+      const contextUsage = await this.executor.measureContextUsage(runSession, promptToUse);
+      const firstPass = await this.executor.runPrompt(runSession, promptToUse, args.useStreaming, args.onChunk);
 
       let response = firstPass.truncated ? firstPass.text.trimEnd() : firstPass.text;
-      let repairPassMs: number | null = null;
-      const repairAttempts: RepairAttempt[] = [];
       let fallbackUsed = false;
       let parsed = this.hydrateParsed(JsonTools.extractResponse(response), args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
       if (parsed) response = JsonTools.serializeToXml(parsed);
-      let bestResponse = response;
-      let bestParsed = parsed;
 
-      // Skip repair if first pass was truncated — session is likely in bad state
-      if (!firstPass.truncated && LanguageModelGuard.needsAudioRetry(parsed, args.audioDurationMs, args.codeDetected)) {
-        try {
-          const result = await this.repairEngine.runAudioRetry(
-            baseSession,
-            args.prompt,
-            args.useStreaming,
-            args.onChunk,
-            bestParsed,
-            args.audioDurationMs,
-            args.codeDetected
-          );
-          response = result.response;
-          parsed = this.hydrateParsed(result.parsed, args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
-          response = parsed ? JsonTools.serializeToXml(parsed) : result.response;
-          bestResponse = response;
-          bestParsed = parsed;
-          repairAttempts.push(result.attempt);
-          repairPassMs = (repairPassMs ?? 0) + result.elapsedMs;
-        } catch (error) {
-          console.error("Error during asr_text_retry:", error);
-          repairAttempts.push({
-            reason: "asr_text_retry",
-            elapsedMs: 0,
-            accepted: false,
-            improved: false,
-            scoreDelta: 0,
-            truncated: true,
-            scoreBefore: LanguageModelGuard.parsedContentScore(bestParsed),
-            scoreAfter: 0,
-            outputChars: 0,
-          });
-        }
-      }
+      const pipeline = new RepairPipeline(this.repairEngine, {
+        sourceTranscript: args.sourceTranscript,
+        localCodeSketch: args.localCodeSketch,
+        localCodeTags: args.localCodeTags,
+      });
 
-      if (!firstPass.truncated && !parsed) {
-        try {
-          const result = await this.repairEngine.runJsonRepair(
-            baseSession,
-            response,
-            args.onChunk,
-            bestParsed
-          );
-          response = result.response;
-          parsed = this.hydrateParsed(result.parsed, args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
-          response = parsed ? JsonTools.serializeToXml(parsed) : result.response;
-          bestResponse = response;
-          bestParsed = parsed;
-          repairAttempts.push(result.attempt);
-          repairPassMs = (repairPassMs ?? 0) + result.elapsedMs;
-        } catch (error) {
-          console.error("Error during json_repair:", error);
-          repairAttempts.push({
-            reason: "json_repair",
-            elapsedMs: 0,
-            accepted: false,
-            improved: false,
-            scoreDelta: 0,
-            truncated: true,
-            scoreBefore: LanguageModelGuard.parsedContentScore(bestParsed),
-            scoreAfter: 0,
-            outputChars: 0,
-          });
-        }
-      }
+      let ctx: RepairContext = {
+        bestResponse: response,
+        bestParsed: parsed,
+        repairAttempts: [],
+        repairPassMs: null,
+      };
 
-      // Cognitive Self-Refinement Pass (Dual-Pass)
-      if (!firstPass.truncated && parsed && LanguageModelGuard.needsRefinementPass(parsed)) {
-        try {
-          const result = await this.repairEngine.runSelfRefinement(
-            baseSession,
-            bestParsed,
-            args.useStreaming,
-            args.onChunk
-          );
-          response = result.response;
-          parsed = this.hydrateParsed(result.parsed, args.sourceTranscript, args.localCodeSketch, args.localCodeTags);
-          response = parsed ? JsonTools.serializeToXml(parsed) : result.response;
-          bestResponse = response;
-          bestParsed = parsed;
-          repairAttempts.push(result.attempt);
-          repairPassMs = (repairPassMs ?? 0) + result.elapsedMs;
-        } catch (error) {
-          console.error("Error during self_refinement:", error);
-          repairAttempts.push({
-            reason: "self_refinement",
-            elapsedMs: 0,
-            accepted: false,
-            improved: false,
-            scoreDelta: 0,
-            truncated: true,
-            scoreBefore: LanguageModelGuard.parsedContentScore(bestParsed),
-            scoreAfter: 0,
-            outputChars: 0,
-          });
-        }
-      }
+      ctx = await pipeline.runStage(ctx, baseSession, "asr_text_retry",
+        !firstPass.truncated && LanguageModelGuard.needsAudioRetry(parsed, args.audioDurationMs, args.codeDetected),
+        firstPass.truncated,
+        (s) => this.repairEngine.runAudioRetry(s, promptToUse, args.useStreaming, args.onChunk, ctx.bestParsed, args.audioDurationMs, args.codeDetected)
+      );
 
-      if (LanguageModelGuard.needsVisibleEmptyFallback(parsed)) {
+      ctx = await pipeline.runStage(ctx, baseSession, "json_repair",
+        !firstPass.truncated && !ctx.bestParsed,
+        firstPass.truncated,
+        (s) => this.repairEngine.runJsonRepair(s, ctx.bestResponse, args.onChunk, ctx.bestParsed)
+      );
+
+      ctx = await pipeline.runStage(ctx, baseSession, "self_refinement",
+        !firstPass.truncated && Boolean(ctx.bestParsed) && LanguageModelGuard.needsRefinementPass(ctx.bestParsed),
+        firstPass.truncated,
+        (s) => this.repairEngine.runSelfRefinement(s, ctx.bestParsed, args.useStreaming, args.onChunk)
+      );
+
+      if (LanguageModelGuard.needsVisibleEmptyFallback(ctx.bestParsed)) {
         fallbackUsed = true;
         response = JSON.stringify({
-          think: parsed?.think ?? "",
-          tags: parsed?.thought_tags ?? "",
-          transcript: parsed?.transcript ?? "",
-          code: parsed?.code ?? "",
+          think: ctx.bestParsed?.think ?? "",
+          tags: ctx.bestParsed?.thought_tags ?? "",
+          transcript: ctx.bestParsed?.transcript ?? "",
+          code: ctx.bestParsed?.code ?? "",
           answer: "No pude extraer una transcripcion util del audio; reintenta o graba una frase un poco mas clara.",
-          directed: parsed?.is_directed ?? true,
-          lang: parsed?.lang || "es",
+          directed: ctx.bestParsed?.is_directed ?? true,
+          lang: ctx.bestParsed?.lang || "es",
           needs_context: true,
         });
+      } else {
+        response = ctx.bestResponse;
       }
 
       return {
         firstPass,
         response,
-        repairPassMs,
-        repairAttempts,
+        repairPassMs: ctx.repairPassMs,
+        repairAttempts: ctx.repairAttempts,
         fallbackUsed,
         contextUsage,
         sessionShape: this.shape(runSession),
